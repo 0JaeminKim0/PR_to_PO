@@ -512,23 +512,23 @@ app.get('/', (c) => {
             <div class="space-y-2">
                 <div id="mp-pr-receipt" class="process-box selected rounded-lg p-3 cursor-pointer bg-white">
                     <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium">PR 접수</span>
+                        <span class="text-sm font-medium">PR 검토 및 발주 방식 판단</span>
                         <span class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">PoC</span>
                     </div>
                 </div>
                 <div class="arrow-down"></div>
                 <div class="process-box disabled rounded-lg p-3 bg-white">
-                    <span class="text-sm font-medium text-gray-400">물량검토 수행</span>
+                    <span class="text-sm font-medium text-gray-400">협력사 물량 검토 자동 요청</span>
                     <div class="text-xs text-gray-400 mt-1">미구현</div>
                 </div>
                 <div class="arrow-down"></div>
                 <div class="process-box disabled rounded-lg p-3 bg-white">
-                    <span class="text-sm font-medium text-gray-400">물량검토 결과 검증</span>
+                    <span class="text-sm font-medium text-gray-400">협력사 물량 검토 제출 결과 검증/지원</span>
                     <div class="text-xs text-gray-400 mt-1">미구현</div>
                 </div>
                 <div class="arrow-down"></div>
                 <div class="process-box disabled rounded-lg p-3 bg-white">
-                    <span class="text-sm font-medium text-gray-400">PO 발행</span>
+                    <span class="text-sm font-medium text-gray-400">물량검토 결과 기반 PO 자동 발행</span>
                     <div class="text-xs text-gray-400 mt-1">미구현</div>
                 </div>
             </div>
@@ -537,25 +537,25 @@ app.get('/', (c) => {
         <!-- Sub Process 패널 -->
         <div class="w-52 bg-gray-50 border-r p-4 flex-shrink-0">
             <h3 class="text-sm font-semibold text-gray-600 mb-1">Sub Process</h3>
-            <p class="text-xs text-gray-400 mb-3">(PR 접수)</p>
+            <p class="text-xs text-gray-400 mb-3">(PR 검토 및 발주 방식 판단)</p>
             <div class="space-y-2">
                 <div id="sp-contract-price" class="process-box selected rounded-lg p-3 cursor-pointer bg-white" data-step="1">
                     <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium">계약단가 존재 확인</span>
+                        <span class="text-sm font-medium">PR 자재별 계약 여부 판별</span>
                     </div>
                     <div id="sp-contract-price-status" class="text-xs text-gray-400 mt-1">대기</div>
                 </div>
                 <div class="arrow-down"></div>
                 <div id="sp-type-code" class="process-box rounded-lg p-3 cursor-pointer bg-white" data-step="2">
                     <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium">철의장유형코드 검증</span>
+                        <span class="text-sm font-medium">철의장유형코드 검증/수정</span>
                     </div>
                     <div id="sp-type-code-status" class="text-xs text-gray-400 mt-1">대기</div>
                 </div>
                 <div class="arrow-down"></div>
                 <div id="sp-review-decision" class="process-box rounded-lg p-3 cursor-pointer bg-white" data-step="3">
                     <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium">물량검토 대상 결정</span>
+                        <span class="text-sm font-medium">발주 방식 결정</span>
                     </div>
                     <div id="sp-review-decision-status" class="text-xs text-gray-400 mt-1">대기</div>
                 </div>
@@ -627,9 +627,9 @@ app.get('/', (c) => {
 
         // Sub Process 매핑
         const subProcessMap = {
-            'contractPrice': { id: 'sp-contract-price', title: '계약단가 존재 확인', statusId: 'sp-contract-price-status' },
-            'typeCodeValidation': { id: 'sp-type-code', title: '철의장유형코드 검증', statusId: 'sp-type-code-status' },
-            'reviewDecision': { id: 'sp-review-decision', title: '물량검토 대상 결정', statusId: 'sp-review-decision-status' }
+            'contractPrice': { id: 'sp-contract-price', title: 'PR 자재별 계약 여부 판별', statusId: 'sp-contract-price-status' },
+            'typeCodeValidation': { id: 'sp-type-code', title: '철의장유형코드 검증/수정', statusId: 'sp-type-code-status' },
+            'reviewDecision': { id: 'sp-review-decision', title: '발주 방식 결정', statusId: 'sp-review-decision-status' }
         };
 
         // Initialize
