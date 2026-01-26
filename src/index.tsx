@@ -177,6 +177,36 @@ app.get('/api/statistics/phase1', (c) => {
   })
 })
 
+// API: 통합 통계 (healthcheck용 - 기존 API 호환)
+app.get('/api/statistics', (c) => {
+  const total = (prData as any[]).length
+  let analyzed = 0
+  let 물량검토 = 0
+  let 견적대상 = 0
+  let HITL필요 = 0
+  
+  for (const [_, result] of phase1Results) {
+    if (result.status === 'completed' && result.finalResult) {
+      analyzed++
+      const 분류 = result.finalResult.최종분류
+      if (분류?.includes('물량검토')) 물량검토++
+      else if (분류?.includes('견적')) 견적대상++
+      else HITL필요++
+    }
+  }
+  
+  const 자동처리 = 물량검토 + 견적대상
+  
+  return c.json({
+    total,
+    analyzed,
+    물량검토,
+    견적대상,
+    HITL필요,
+    자동처리율: analyzed > 0 ? ((자동처리 / analyzed) * 100).toFixed(1) : '0.0'
+  })
+})
+
 // ============================================================================
 // Phase 1: LLM 프롬프트 빌더
 // ============================================================================
