@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
 // PR 데이터 및 단가테이블 (TypeScript 모듈로 포함)
-import { prData } from './pr-data'
-import { priceTable } from './price-table'
+import { prData } from './pr-data.js'
+import { priceTable } from './price-table.js'
 
 type Bindings = {
   ANTHROPIC_API_KEY?: string
@@ -225,8 +225,8 @@ app.post('/api/analyze/:prNo', async (c) => {
     return c.json({ error: 'PR not found' }, 404)
   }
 
-  // API Key 확인
-  const apiKey = c.env?.ANTHROPIC_API_KEY
+  // API Key 확인 (Node.js 환경에서는 process.env 사용)
+  const apiKey = process.env.ANTHROPIC_API_KEY || c.env?.ANTHROPIC_API_KEY
   if (!apiKey) {
     return c.json({ 
       error: 'ANTHROPIC_API_KEY not configured',

@@ -14,34 +14,18 @@
 
 ### 2. 3단계 분석 과정 시각화
 - **STEP 1 (Input)**: PR 기본 정보 표시
-  - PR No, 자재내역, 자재속성, 재질 등
-  - 현재/SYS/PR 유형코드 비교
-  
 - **STEP 2 (AI Agent 추론)**: Claude API 호출 과정
-  - System Prompt 요약
-  - User Prompt 요약
-  - 처리 상태 및 소요 시간
-
-- **STEP 3 (Output)**: 분석 결과
-  - 단가존재여부 + 근거
-  - 유형코드 검증 결과
-  - 최종분류 및 종합의견
+- **STEP 3 (Output)**: 분석 결과 및 근거
 
 ### 3. 통계 대시보드
-- 총 분석 건수
-- 물량검토 / 견적대상 / HITL필요 분류
+- 총 분석 건수, 물량검토/견적대상/HITL필요 분류
 - 자동처리율 계산
 
-### 4. 분석 실행
-- 단건 분석: 선택된 PR 1건 분석
-- 전체 분석: 모든 PR 순차 분석
-- 초기화: 분석 결과 리셋
-
 ## 기술 스택
-- **Backend**: Hono (TypeScript)
+- **Backend**: Hono + Node.js (TypeScript)
 - **Frontend**: TailwindCSS (CDN), Vanilla JavaScript
 - **AI**: Claude API (claude-sonnet-4-20250514)
-- **Deployment**: Cloudflare Pages
+- **Deployment**: Railway / Cloudflare Pages
 
 ## API Endpoints
 
@@ -64,11 +48,11 @@ npm install
 # 빌드
 npm run build
 
-# 개발 서버 (PM2)
-pm2 start ecosystem.config.cjs
+# 개발 서버
+npm run dev
 
-# 테스트
-curl http://localhost:3000/api/pr-list
+# 프로덕션 실행
+npm start
 ```
 
 ## 환경 변수
@@ -76,13 +60,32 @@ curl http://localhost:3000/api/pr-list
 | 변수 | 설명 |
 |------|------|
 | `ANTHROPIC_API_KEY` | Claude API 키 (필수) |
+| `PORT` | 서버 포트 (기본: 3000) |
 
-## Cloudflare 배포
+## Railway 배포
+
+### 1. GitHub 연동
+1. Railway 대시보드에서 "New Project" 클릭
+2. "Deploy from GitHub repo" 선택
+3. 저장소 연결
+
+### 2. 환경 변수 설정
+Railway Variables 탭에서:
+```
+ANTHROPIC_API_KEY=your-api-key-here
+PORT=3000
+```
+
+### 3. 자동 배포
+- Push 시 자동 빌드 및 배포
+- Dockerfile 기반 빌드
+
+## Cloudflare Pages 배포 (대안)
 
 ```bash
-# 빌드 및 배포
-npm run build
-npx wrangler pages deploy dist --project-name pr-analysis-agent
+# Cloudflare 빌드 및 배포
+npm run build:cf
+npm run deploy:cf
 
 # Secret 설정
 npx wrangler pages secret put ANTHROPIC_API_KEY --project-name pr-analysis-agent
@@ -94,13 +97,7 @@ npx wrangler pages secret put ANTHROPIC_API_KEY --project-name pr-analysis-agent
 - 대표PR, 자재내역, 자재속성, 재질, 철의장유형코드 등
 
 ### 단가테이블 (7개 자재속성그룹)
-- PQPA: PIPE SUPPORT ACCOMM. AREA
-- PQPD: PIPE SUPPORT HULL AREA
-- PQPG: PIPE SUPPORT FOR GRE/GRP
-- PQPM: PIPE SUPPORT MACHINERY AREA
-- PQPS: PIPE SUPPORT
-- PQPU: PIPE SUPPORT FOR UNIT
-- PQPC: PIPE COAMING
+- PQPA, PQPD, PQPG, PQPM, PQPS, PQPU, PQPC
 
 ### 철의장상세구분 코드
 - B: 상선 기본(SS400)
@@ -113,6 +110,6 @@ npx wrangler pages secret put ANTHROPIC_API_KEY --project-name pr-analysis-agent
 - E: COAMING (SUS316L) - PQPC 전용
 
 ## 배포 상태
-- **Platform**: Cloudflare Pages
+- **Platform**: Railway (권장) / Cloudflare Pages
 - **Status**: 개발 완료
 - **Last Updated**: 2026-01-26

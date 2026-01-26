@@ -2,8 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'pr-analysis-agent',
-      script: 'npx',
-      args: 'wrangler pages dev dist --ip 0.0.0.0 --port 3000',
+      script: 'dist/server.js',
       env: {
         NODE_ENV: 'development',
         PORT: 3000

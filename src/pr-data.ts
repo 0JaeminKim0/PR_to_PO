@@ -1296,6 +1296,6 @@ export const prData = [
     "자재속성_4자리": "PQPD",
     "단가테이블매칭": true
   }
-] as const;
+];
 
 export type PRData = typeof prData[number];

@@ -79,6 +79,6 @@ export const priceTable = {
       {"code": "G", "name": "COAMING 기본TYPE"}
     ]
   }
-} as const;
+};
 
 export type PriceTable = typeof priceTable;
