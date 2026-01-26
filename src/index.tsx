@@ -47,7 +47,7 @@ type Phase1BatchResult = {
   철의장유형코드_원본?: string
 }
 
-// Phase 2 결과 타입 (배치)
+// Phase 2 결과 타입 (배치) - HITL 화면 개선을 위해 확장
 type Phase2BatchResult = {
   자재번호: string
   검토구분: string
@@ -55,6 +55,17 @@ type Phase2BatchResult = {
   권장조치: string
   검증근거: string
   LLM_추론?: any
+  // PR 정보 (HITL 화면용)
+  자재내역?: string
+  현재유형코드?: string
+  변경요청코드?: string
+  업체명?: string
+  도면번호?: string
+  // Review 정보 (HITL 화면용)
+  변경요청단가?: number
+  변경유형코드명?: string
+  // HITL 유형 구분
+  HITL유형?: '협상필요' | 'Vision불일치' | '도면없음'
 }
 
 // Step 상태 타입
@@ -504,12 +515,26 @@ app.post('/api/integrated/run-all', async (c) => {
     // 3. 협상필요 - 일괄 HITL
     for (const review of negotiation) {
       const requestPrice = review['변경요청단가'] || 0
+      // PR 정보 조회 (자재번호로 조인)
+      const prInfo = phase1Results.find((p: Phase1BatchResult) => p.자재번호 === review['자재번호'])
+      
       phase2Results.push({
         자재번호: review['자재번호'],
         검토구분: '협상필요',
         검증결과: '검토필요',
         권장조치: 'HITL',
-        검증근거: `공급사 검토 결과: 협상필요. 요청단가 ${requestPrice.toLocaleString()}원. 담당자 검토 필요`
+        검증근거: `공급사 검토 결과: 협상필요. 요청단가 ${requestPrice.toLocaleString()}원. 담당자 검토 필요`,
+        // PR 정보
+        자재내역: prInfo?.자재내역 || review['자재내역'],
+        현재유형코드: prInfo?.유형코드 || review['철의장유형코드'],
+        변경요청코드: review['변경유형코드'],
+        업체명: prInfo?.업체명 || review['업체명'],
+        도면번호: review['도면번호'],
+        // Review 정보
+        변경요청단가: requestPrice,
+        변경유형코드명: review['변경유형코드명'],
+        // HITL 유형
+        HITL유형: '협상필요'
       })
     }
     
@@ -522,10 +547,28 @@ app.post('/api/integrated/run-all', async (c) => {
       const currentType = review['철의장유형코드'] || ''
       const changeType = review['변경유형코드'] || ''
       
+      // PR 정보 조회 (자재번호로 조인)
+      const prInfo = phase1Results.find((p: Phase1BatchResult) => p.자재번호 === review['자재번호'])
+      
+      // 공통 PR/Review 정보
+      const commonInfo = {
+        자재내역: prInfo?.자재내역 || review['자재내역'],
+        현재유형코드: currentType,
+        변경요청코드: changeType,
+        업체명: prInfo?.업체명 || review['업체명'],
+        도면번호: review['도면번호'],
+        변경유형코드명: review['변경유형코드명']
+      }
+      
       if (drawingInfo) {
         // 도면 정보가 있으면 LLM Vision 검증 시뮬레이션
         // 실제 Vision API 호출 대신 규칙 기반 검증
         const llmType = inferTypeFromDrawing(review, drawingInfo)
+        const llmResult = { 
+          추론_단가유형: llmType, 
+          신뢰도: changeType === llmType ? '높음' : '중간',
+          판단근거: inferReasonFromDrawing(review, llmType)
+        }
         
         if (changeType === llmType) {
           phase2Results.push({
@@ -534,7 +577,8 @@ app.post('/api/integrated/run-all', async (c) => {
             검증결과: '적합',
             권장조치: '확정',
             검증근거: `공급사 변경유형코드 '${changeType}'이 도면 분석 결과와 일치`,
-            LLM_추론: { 추론_단가유형: llmType, 신뢰도: '높음' }
+            LLM_추론: llmResult,
+            ...commonInfo
           })
         } else {
           phase2Results.push({
@@ -543,7 +587,9 @@ app.post('/api/integrated/run-all', async (c) => {
             검증결과: '부적합',
             권장조치: 'HITL',
             검증근거: `공급사 '${changeType}' ≠ 도면 분석 '${llmType}'. 담당자 검토 필요`,
-            LLM_추론: { 추론_단가유형: llmType, 신뢰도: '중간' }
+            LLM_추론: llmResult,
+            HITL유형: 'Vision불일치',
+            ...commonInfo
           })
         }
       } else {
@@ -554,7 +600,8 @@ app.post('/api/integrated/run-all', async (c) => {
             검토구분: '단가유형변경',
             검증결과: '적합',
             권장조치: '확정',
-            검증근거: `유형코드 동일 (${currentType}). 세부 유형 변경으로 자동 확정`
+            검증근거: `유형코드 동일 (${currentType}). 세부 유형 변경으로 자동 확정`,
+            ...commonInfo
           })
         } else {
           phase2Results.push({
@@ -562,7 +609,9 @@ app.post('/api/integrated/run-all', async (c) => {
             검토구분: '단가유형변경',
             검증결과: '검토필요',
             권장조치: 'HITL',
-            검증근거: `유형코드 변경 (${currentType} → ${changeType}). 도면 확인 필요`
+            검증근거: `유형코드 변경 (${currentType} → ${changeType}). 도면 확인 필요`,
+            HITL유형: '도면없음',
+            ...commonInfo
           })
         }
       }
@@ -726,6 +775,43 @@ function inferTypeFromDrawing(review: any, drawingInfo: any): string {
     return 'N'
   }
   return 'B'
+}
+
+function inferReasonFromDrawing(review: any, inferredType: string): string[] {
+  // Vision 분석 근거 생성 (시뮬레이션)
+  const 자재내역 = String(review['자재내역'] || '').toUpperCase()
+  const 재질 = String(review['재질'] || '').toUpperCase()
+  const reasons: string[] = []
+  
+  switch (inferredType) {
+    case 'I':
+      if (자재내역.includes('PIPE')) reasons.push('도면에 PIPE 형태 확인')
+      reasons.push('원형 파이프 단면 구조')
+      break
+    case 'G':
+      if (자재내역.includes('COAMING')) reasons.push('COAMING 형태 구조')
+      if (자재내역.includes('COVER')) reasons.push('COVER/BOX류 형태')
+      if (자재내역.includes('BENDING')) reasons.push('점선 밴딩 표기 확인')
+      reasons.push('특수 형상 가공 필요')
+      break
+    case 'A':
+      reasons.push('재질 SUS304 확인')
+      reasons.push('스테인리스 재질 적용')
+      break
+    case 'S':
+      reasons.push('재질 SUS316 확인')
+      reasons.push('고내식성 스테인리스 적용')
+      break
+    case 'N':
+      reasons.push('CHECK PLATE 텍스트 확인')
+      reasons.push('미끄럼 방지 플레이트')
+      break
+    default:
+      reasons.push('기본 Angle + Plate 조합')
+      reasons.push('단순 구조물')
+  }
+  
+  return reasons
 }
 
 // ============================================================================
@@ -982,9 +1068,18 @@ app.get('/', (c) => {
             <div id="hitl-section" class="bg-white rounded-xl shadow-md p-6 mb-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
                     <i class="fas fa-user-cog mr-2 text-yellow-600"></i>
-                    HITL 필요 건 (<span id="hitl-count">0</span>건)
+                    HITL 필요 건 (<span id="hitl-count">0</span>건) - 담당자 검토 필요
                 </h3>
-                <div id="hitl-list" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
+                
+                <!-- HITL 유형별 필터 탭 -->
+                <div class="flex space-x-2 mb-4 border-b">
+                    <button id="hitl-filter-all" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">전체</button>
+                    <button id="hitl-filter-negotiation" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">협상필요</button>
+                    <button id="hitl-filter-vision" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Vision 불일치</button>
+                    <button id="hitl-filter-nodrawing" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">도면 없음</button>
+                </div>
+                
+                <div id="hitl-list" class="space-y-4 max-h-[600px] overflow-y-auto scrollbar-thin">
                 </div>
             </div>
             
@@ -1358,27 +1453,105 @@ app.get('/', (c) => {
             }).join('');
         }
 
+        // HITL 전역 상태
+        let currentHitlFilter = 'all';
+        let allHitlItems = [];
+
         function renderHitlList() {
             const container = document.getElementById('hitl-list');
-            const hitlItems = currentState.phase2Results.filter(r => r.권장조치 === 'HITL');
+            allHitlItems = currentState.phase2Results.filter(r => r.권장조치 === 'HITL');
             
-            document.getElementById('hitl-count').textContent = hitlItems.length;
+            document.getElementById('hitl-count').textContent = allHitlItems.length;
             
-            if (hitlItems.length === 0) {
+            if (allHitlItems.length === 0) {
                 document.getElementById('hitl-section').classList.add('hidden');
                 return;
             }
             
             document.getElementById('hitl-section').classList.remove('hidden');
             
-            container.innerHTML = hitlItems.map(item => {
-                return '<div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">' +
-                    '<div>' +
-                        '<span class="font-mono text-sm">' + (item.자재번호 || '').substring(0, 20) + '...</span>' +
-                        '<span class="ml-2 text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded">' + item.검토구분 + '</span>' +
-                    '</div>' +
-                    '<div class="text-sm text-gray-600">' + item.검증근거 + '</div>' +
-                '</div>';
+            // 필터 이벤트 설정
+            setupHitlFilters();
+            
+            // 초기 렌더링 (전체)
+            renderHitlCards(allHitlItems);
+        }
+        
+        function setupHitlFilters() {
+            const filters = ['all', 'negotiation', 'vision', 'nodrawing'];
+            const filterMap = {
+                'all': null,
+                'negotiation': '협상필요',
+                'vision': 'Vision불일치',
+                'nodrawing': '도면없음'
+            };
+            
+            filters.forEach(filter => {
+                const btn = document.getElementById('hitl-filter-' + filter);
+                if (btn) {
+                    btn.onclick = () => {
+                        currentHitlFilter = filter;
+                        
+                        // 탭 스타일 업데이트
+                        filters.forEach(f => {
+                            const b = document.getElementById('hitl-filter-' + f);
+                            if (f === filter) {
+                                b.className = 'px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600';
+                            } else {
+                                b.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700';
+                            }
+                        });
+                        
+                        // 필터링된 아이템 렌더링
+                        const filtered = filter === 'all' 
+                            ? allHitlItems 
+                            : allHitlItems.filter(item => item.HITL유형 === filterMap[filter]);
+                        renderHitlCards(filtered);
+                    };
+                }
+            });
+        }
+        
+        function renderHitlCards(items) {
+            const container = document.getElementById('hitl-list');
+            
+            if (items.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8">해당 유형의 HITL 건이 없습니다.</div>';
+                return;
+            }
+            
+            container.innerHTML = items.map(item => {
+                const hitlType = item.HITL유형 || '협상필요';
+                
+                // HITL 유형별 배지 색상
+                let typeBadgeClass = 'bg-yellow-100 text-yellow-800';
+                let typeIcon = 'fas fa-handshake';
+                if (hitlType === 'Vision불일치') {
+                    typeBadgeClass = 'bg-red-100 text-red-800';
+                    typeIcon = 'fas fa-eye';
+                } else if (hitlType === '도면없음') {
+                    typeBadgeClass = 'bg-gray-100 text-gray-800';
+                    typeIcon = 'fas fa-file-alt';
+                }
+                
+                // HITL 유형별 추가 정보 섹션
+                let additionalInfo = '';
+                
+                if (hitlType === '협상필요') {
+                    const price = item.변경요청단가 || 0;
+                    additionalInfo = '\n                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">\n                        <div class="flex items-center mb-2">\n                            <i class="fas fa-won-sign text-orange-500 mr-2"></i>\n                            <span class="font-semibold text-orange-800">요청단가</span>\n                        </div>\n                        <div class="text-2xl font-bold text-orange-600">' + price.toLocaleString() + '원</div>\n                        <div class="text-xs text-orange-500 mt-1">공급사가 단가 협상을 요청했습니다</div>\n                    </div>';
+                } else if (hitlType === 'Vision불일치') {
+                    const llm = item.LLM_추론 || {};
+                    const llmType = llm.추론_단가유형 || '-';
+                    const confidence = llm.신뢰도 || '중간';
+                    const reasons = llm.판단근거 || [];
+                    
+                    additionalInfo = '\n                    <div class="bg-red-50 border border-red-200 rounded-lg p-3">\n                        <div class="flex items-center mb-2">\n                            <i class="fas fa-balance-scale text-red-500 mr-2"></i>\n                            <span class="font-semibold text-red-800">코드 비교</span>\n                        </div>\n                        <div class="flex items-center space-x-4 mb-3">\n                            <div class="flex-1 bg-white rounded p-2 text-center">\n                                <div class="text-xs text-gray-500">공급사 요청</div>\n                                <div class="text-xl font-bold text-red-600">' + (item.변경요청코드 || '-') + '</div>\n                            </div>\n                            <div class="text-gray-400"><i class="fas fa-not-equal"></i></div>\n                            <div class="flex-1 bg-white rounded p-2 text-center">\n                                <div class="text-xs text-gray-500">LLM 분석</div>\n                                <div class="text-xl font-bold text-blue-600">' + llmType + '</div>\n                            </div>\n                        </div>\n                        <div class="text-sm">\n                            <div class="flex items-center mb-1">\n                                <span class="text-gray-600">신뢰도:</span>\n                                <span class="ml-2 px-2 py-0.5 rounded text-xs ' + (confidence === '높음' ? 'bg-green-100 text-green-800' : confidence === '중간' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') + '">' + confidence + '</span>\n                            </div>\n                            <div class="text-xs text-gray-600 mt-2">\n                                <div class="font-medium mb-1">판단 근거:</div>\n                                <ul class="list-disc list-inside space-y-0.5">' + reasons.map(r => '<li>' + r + '</li>').join('') + '</ul>\n                            </div>\n                        </div>\n                    </div>';
+                } else if (hitlType === '도면없음') {
+                    additionalInfo = '\n                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">\n                        <div class="flex items-center mb-2">\n                            <i class="fas fa-exchange-alt text-gray-500 mr-2"></i>\n                            <span class="font-semibold text-gray-800">유형코드 변경</span>\n                        </div>\n                        <div class="flex items-center justify-center space-x-4">\n                            <div class="text-center">\n                                <div class="text-xs text-gray-500">변경 전</div>\n                                <div class="text-2xl font-bold text-gray-600">' + (item.현재유형코드 || '-') + '</div>\n                            </div>\n                            <div class="text-2xl text-gray-400"><i class="fas fa-arrow-right"></i></div>\n                            <div class="text-center">\n                                <div class="text-xs text-gray-500">변경 후</div>\n                                <div class="text-2xl font-bold text-indigo-600">' + (item.변경요청코드 || '-') + '</div>\n                            </div>\n                        </div>\n                        <div class="text-xs text-gray-500 mt-2 text-center">도면 정보가 없어 자동 검증 불가</div>\n                    </div>';
+                }
+                
+                return '\n                <div class="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition">\n                    <!-- 카드 헤더 -->\n                    <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b">\n                        <div class="flex items-center space-x-3">\n                            <span class="px-3 py-1 rounded-full text-xs font-medium ' + typeBadgeClass + '">\n                                <i class="' + typeIcon + ' mr-1"></i>' + hitlType + '\n                            </span>\n                            <span class="text-xs text-gray-500">' + item.검토구분 + '</span>\n                        </div>\n                        <div class="flex space-x-2">\n                            <button class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">\n                                <i class="fas fa-check mr-1"></i>확정\n                            </button>\n                            <button class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">\n                                <i class="fas fa-times mr-1"></i>반려\n                            </button>\n                            <button class="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">\n                                <i class="fas fa-image mr-1"></i>도면보기\n                            </button>\n                        </div>\n                    </div>\n                    \n                    <!-- 카드 본문 -->\n                    <div class="p-4">\n                        <!-- PR 정보 그리드 -->\n                        <div class="grid grid-cols-2 gap-4 mb-4">\n                            <div class="space-y-2">\n                                <div>\n                                    <label class="text-xs text-gray-500">자재번호</label>\n                                    <div class="font-mono text-sm font-medium text-gray-800">' + (item.자재번호 || '-') + '</div>\n                                </div>\n                                <div>\n                                    <label class="text-xs text-gray-500">자재내역</label>\n                                    <div class="text-sm text-gray-700 truncate" title="' + (item.자재내역 || '') + '">' + (item.자재내역 || '-').substring(0, 50) + (item.자재내역?.length > 50 ? '...' : '') + '</div>\n                                </div>\n                                <div>\n                                    <label class="text-xs text-gray-500">업체명</label>\n                                    <div class="text-sm text-gray-700">' + (item.업체명 || '-') + '</div>\n                                </div>\n                            </div>\n                            <div class="space-y-2">\n                                <div class="flex space-x-4">\n                                    <div>\n                                        <label class="text-xs text-gray-500">현재유형코드</label>\n                                        <div class="text-lg font-bold text-gray-700">' + (item.현재유형코드 || '-') + '</div>\n                                    </div>\n                                    <div>\n                                        <label class="text-xs text-gray-500">변경요청코드</label>\n                                        <div class="text-lg font-bold text-indigo-600">' + (item.변경요청코드 || '-') + '</div>\n                                    </div>\n                                </div>\n                                <div>\n                                    <label class="text-xs text-gray-500">도면번호</label>\n                                    <div class="text-sm text-gray-700 font-mono">' + (item.도면번호 || '-') + '</div>\n                                </div>\n                            </div>\n                        </div>\n                        \n                        <!-- HITL 유형별 추가 정보 -->' + additionalInfo + '\n                        \n                        <!-- 검증 근거 -->\n                        <div class="mt-4 bg-blue-50 rounded-lg p-3">\n                            <div class="flex items-center mb-1">\n                                <i class="fas fa-info-circle text-blue-500 mr-2"></i>\n                                <span class="text-xs font-medium text-blue-800">검증 근거</span>\n                            </div>\n                            <div class="text-sm text-blue-700">' + (item.검증근거 || '-') + '</div>\n                        </div>\n                    </div>\n                </div>';
             }).join('');
         }
 
