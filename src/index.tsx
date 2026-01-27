@@ -914,6 +914,178 @@ app.post('/api/reset', (c) => {
 })
 
 // ============================================================================
+// HITL 승인/반려 API
+// ============================================================================
+
+// HITL 승인 → PO 자동 생성
+app.post('/api/hitl/approve', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { 자재번호 } = body
+    
+    if (!자재번호) {
+      return c.json({ success: false, error: '자재번호가 필요합니다.' }, 400)
+    }
+    
+    // Phase2 결과에서 해당 HITL 건 찾기
+    const hitlIndex = integratedState.phase2Results.findIndex(
+      r => r.자재번호 === 자재번호 && r.권장조치 === 'HITL'
+    )
+    
+    if (hitlIndex === -1) {
+      return c.json({ success: false, error: 'HITL 건을 찾을 수 없습니다.' }, 404)
+    }
+    
+    const hitlItem = integratedState.phase2Results[hitlIndex]
+    
+    // HITL → 확정으로 변경
+    integratedState.phase2Results[hitlIndex] = {
+      ...hitlItem,
+      권장조치: '확정',
+      검증결과: '적합',
+      검증근거: hitlItem.검증근거 + ' → 담당자 승인 처리'
+    }
+    
+    // PO 생성
+    const poNumber = poGenerator.generate()
+    const orderAmount = hitlItem.발주금액 || 0
+    const now = new Date()
+    const orderDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    
+    const newPO: POResult = {
+      PO_번호: poNumber,
+      PR_NO: hitlItem.PR_NO || '',
+      자재번호: hitlItem.자재번호,
+      업체명: hitlItem.업체명 || '',
+      발주금액: orderAmount,
+      발주일자: orderDate,
+      발주상태: '발주완료',
+      검토구분: hitlItem.검토구분,
+      검증결과: '적합 (HITL 승인)'
+    }
+    
+    integratedState.poResults.push(newPO)
+    
+    // Step 5 데이터 업데이트
+    const totalPOCount = integratedState.poResults.length
+    const totalOrderAmount = integratedState.poResults.reduce((sum, po) => sum + po.발주금액, 0)
+    
+    integratedState.steps.step5 = {
+      status: 'completed',
+      message: `PO 생성 완료: ${totalPOCount}건`,
+      data: {
+        총_PO건수: totalPOCount,
+        총_발주금액: totalOrderAmount
+      }
+    }
+    
+    // Step 6 요약 업데이트
+    const phase2 = integratedState.phase2Results
+    const confirmed = phase2.filter(r => r.권장조치 === '확정').length
+    const hitl = phase2.filter(r => r.권장조치 === 'HITL').length
+    const canceled = phase2.filter(r => r.권장조치 === '검토취소').length
+    const autoRate = phase2.length > 0 ? (((confirmed + canceled) / phase2.length) * 100).toFixed(1) : '0.0'
+    
+    integratedState.steps.step6 = {
+      status: 'completed',
+      message: `자동처리율: ${confirmed + canceled}/${phase2.length}건 (${autoRate}%)`,
+      data: {
+        ...integratedState.steps.step6.data,
+        phase2: { 총_검증건수: phase2.length, 확정: confirmed, HITL: hitl, 검토취소: canceled },
+        po: { 총_PO건수: totalPOCount, 총_발주금액: totalOrderAmount },
+        자동처리율: autoRate
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: 'HITL 승인 및 PO 생성 완료',
+      po: newPO,
+      updated: {
+        총_PO건수: totalPOCount,
+        총_발주금액: totalOrderAmount,
+        남은_HITL건수: hitl
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// HITL 반려 → 검토취소 처리
+app.post('/api/hitl/reject', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { 자재번호, 반려사유 } = body
+    
+    if (!자재번호) {
+      return c.json({ success: false, error: '자재번호가 필요합니다.' }, 400)
+    }
+    
+    // Phase2 결과에서 해당 HITL 건 찾기
+    const hitlIndex = integratedState.phase2Results.findIndex(
+      r => r.자재번호 === 자재번호 && r.권장조치 === 'HITL'
+    )
+    
+    if (hitlIndex === -1) {
+      return c.json({ success: false, error: 'HITL 건을 찾을 수 없습니다.' }, 404)
+    }
+    
+    const hitlItem = integratedState.phase2Results[hitlIndex]
+    
+    // HITL → 검토취소로 변경
+    integratedState.phase2Results[hitlIndex] = {
+      ...hitlItem,
+      권장조치: '검토취소',
+      검증결과: '해당없음',
+      검증근거: hitlItem.검증근거 + ` → 담당자 반려: ${반려사유 || '사유 미입력'}`
+    }
+    
+    // Step 6 요약 업데이트
+    const phase2 = integratedState.phase2Results
+    const confirmed = phase2.filter(r => r.권장조치 === '확정').length
+    const hitl = phase2.filter(r => r.권장조치 === 'HITL').length
+    const canceled = phase2.filter(r => r.권장조치 === '검토취소').length
+    const autoRate = phase2.length > 0 ? (((confirmed + canceled) / phase2.length) * 100).toFixed(1) : '0.0'
+    
+    const totalPOCount = integratedState.poResults.length
+    const totalOrderAmount = integratedState.poResults.reduce((sum, po) => sum + po.발주금액, 0)
+    
+    integratedState.steps.step6 = {
+      status: 'completed',
+      message: `자동처리율: ${confirmed + canceled}/${phase2.length}건 (${autoRate}%)`,
+      data: {
+        ...integratedState.steps.step6.data,
+        phase2: { 총_검증건수: phase2.length, 확정: confirmed, HITL: hitl, 검토취소: canceled },
+        po: { 총_PO건수: totalPOCount, 총_발주금액: totalOrderAmount },
+        자동처리율: autoRate
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: 'HITL 반려 처리 완료',
+      updated: {
+        남은_HITL건수: hitl,
+        검토취소건수: canceled
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// HITL 목록 조회
+app.get('/api/hitl/list', (c) => {
+  const hitlItems = integratedState.phase2Results.filter(r => r.권장조치 === 'HITL')
+  return c.json({
+    success: true,
+    count: hitlItems.length,
+    items: hitlItems
+  })
+})
+
+// ============================================================================
 // 헬퍼 함수
 // ============================================================================
 
@@ -2041,12 +2213,15 @@ app.get('/', (c) => {
         }
         
         function renderPOTable(state) {
+            state = state || currentState;
+            if (!state) return;
+            
             const section = document.getElementById('po-generation-section');
             const tbody = document.getElementById('po-table-body');
             const poResults = state.poResults || [];
             
-            // 통계 업데이트
-            const totalAmount = state.summary?.po?.총_발주금액 || 0;
+            // 통계 업데이트 (poResults 직접 계산)
+            const totalAmount = poResults.reduce((sum, po) => sum + (po.발주금액 || 0), 0);
             document.getElementById('po-total-count').textContent = poResults.length;
             document.getElementById('po-total-amount').textContent = totalAmount.toLocaleString();
             
@@ -2327,19 +2502,23 @@ app.get('/', (c) => {
                         '</div>';
                 }
                 
-                return '<div class="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition">' +
+                const materialNo = item.자재번호;
+                const orderAmount = (item.발주금액 || 0).toLocaleString();
+                
+                return '<div class="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition hitl-card" data-material-no="' + materialNo + '">' +
                     '<div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b">' +
                     '<div class="flex items-center space-x-3">' +
                     '<span class="px-3 py-1 rounded-full text-xs font-medium ' + typeBadgeClass + '">' +
                     '<i class="' + typeIcon + ' mr-1"></i>' + hitlType +
                     '</span>' +
                     '<span class="text-xs text-gray-500">' + item.검토구분 + '</span>' +
+                    '<span class="text-xs text-green-600 font-bold">예상 발주금액: ' + orderAmount + '원</span>' +
                     '</div>' +
                     '<div class="flex space-x-2">' +
-                    '<button class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">' +
+                    '<button class="btn-hitl-approve px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs rounded-lg transition" data-material-no="' + materialNo + '" title="승인하고 PO 생성">' +
                     '<i class="fas fa-check mr-1"></i>확정' +
                     '</button>' +
-                    '<button class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">' +
+                    '<button class="btn-hitl-reject px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition" data-material-no="' + materialNo + '" title="반려 처리">' +
                     '<i class="fas fa-times mr-1"></i>반려' +
                     '</button>' +
                     '<button class="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">' +
@@ -2391,6 +2570,186 @@ app.get('/', (c) => {
                     '</div>' +
                     '</div>';
             }).join('');
+            
+            // HITL 버튼 이벤트 핸들러 설정
+            setupHitlButtonHandlers();
+        }
+        
+        // HITL 승인/반려 버튼 이벤트 핸들러
+        function setupHitlButtonHandlers() {
+            // 승인 버튼
+            document.querySelectorAll('.btn-hitl-approve').forEach(btn => {
+                btn.onclick = async function() {
+                    const materialNo = this.getAttribute('data-material-no');
+                    if (!materialNo) return;
+                    
+                    if (!confirm('해당 건을 승인하고 PO를 생성하시겠습니까?')) return;
+                    
+                    // 버튼 비활성화 (중복 클릭 방지)
+                    this.disabled = true;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>처리중...';
+                    
+                    try {
+                        const response = await fetch('/api/hitl/approve', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ '자재번호': materialNo })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // 성공 알림
+                            showHitlResultModal('approve', result);
+                            
+                            // 상태 업데이트
+                            await refreshState();
+                            
+                            // HITL 목록 재렌더링
+                            renderHitlList();
+                            
+                            // PO 테이블 재렌더링
+                            renderPOTable();
+                            
+                            // Phase2 테이블도 재렌더링
+                            renderPhase2Table();
+                            
+                            // Step5, Step6 UI 업데이트
+                            updateStepStatus(5, currentState.steps.step5);
+                            updateStepStatus(6, currentState.steps.step6);
+                            
+                            addLog('✅ HITL 승인: ' + materialNo + ' → PO ' + result.po.PO_번호 + ' 생성', 'success');
+                        } else {
+                            alert('오류: ' + result.error);
+                            this.disabled = false;
+                            this.innerHTML = '<i class="fas fa-check mr-1"></i>확정';
+                        }
+                    } catch (error) {
+                        alert('요청 실패: ' + error.message);
+                        this.disabled = false;
+                        this.innerHTML = '<i class="fas fa-check mr-1"></i>확정';
+                    }
+                };
+            });
+            
+            // 반려 버튼
+            document.querySelectorAll('.btn-hitl-reject').forEach(btn => {
+                btn.onclick = async function() {
+                    const materialNo = this.getAttribute('data-material-no');
+                    if (!materialNo) return;
+                    
+                    const reason = prompt('반려 사유를 입력해주세요:');
+                    if (reason === null) return; // 취소
+                    
+                    // 버튼 비활성화 (중복 클릭 방지)
+                    this.disabled = true;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>처리중...';
+                    
+                    try {
+                        const response = await fetch('/api/hitl/reject', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ '자재번호': materialNo, '반려사유': reason })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // 성공 알림
+                            showHitlResultModal('reject', result);
+                            
+                            // 상태 업데이트
+                            await refreshState();
+                            
+                            // HITL 목록 재렌더링
+                            renderHitlList();
+                            
+                            // Phase2 테이블도 재렌더링
+                            renderPhase2Table();
+                            
+                            // Step6 UI 업데이트
+                            updateStepStatus(6, currentState.steps.step6);
+                            
+                            addLog('❌ HITL 반려: ' + materialNo + ' (' + (reason || '사유 없음') + ')', 'warning');
+                        } else {
+                            alert('오류: ' + result.error);
+                            this.disabled = false;
+                            this.innerHTML = '<i class="fas fa-times mr-1"></i>반려';
+                        }
+                    } catch (error) {
+                        alert('요청 실패: ' + error.message);
+                        this.disabled = false;
+                        this.innerHTML = '<i class="fas fa-times mr-1"></i>반려';
+                    }
+                };
+            });
+        }
+        
+        // HITL 처리 결과 모달 표시
+        function showHitlResultModal(type, result) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.id = 'hitl-result-modal';
+            
+            if (type === 'approve') {
+                modal.innerHTML = 
+                    '<div class="bg-white rounded-xl shadow-2xl p-6 max-w-md mx-4 transform animate-bounce-in">' +
+                    '<div class="text-center">' +
+                    '<div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">' +
+                    '<i class="fas fa-check-circle text-4xl text-green-500"></i>' +
+                    '</div>' +
+                    '<h3 class="text-xl font-bold text-gray-800 mb-2">✅ PO 생성 완료</h3>' +
+                    '<div class="bg-gray-50 rounded-lg p-4 text-left space-y-2 mb-4">' +
+                    '<div class="flex justify-between"><span class="text-gray-500">PO 번호</span><span class="font-bold text-indigo-600">' + result.po.PO_번호 + '</span></div>' +
+                    '<div class="flex justify-between"><span class="text-gray-500">PR NO</span><span class="font-medium">' + result.po.PR_NO + '</span></div>' +
+                    '<div class="flex justify-between"><span class="text-gray-500">업체명</span><span class="font-medium">' + result.po.업체명 + '</span></div>' +
+                    '<div class="flex justify-between"><span class="text-gray-500">발주금액</span><span class="font-bold text-green-600">' + result.po.발주금액.toLocaleString() + '원</span></div>' +
+                    '</div>' +
+                    '<div class="text-sm text-gray-600 mb-4">' +
+                    '총 PO: <strong>' + result.updated.총_PO건수 + '건</strong> | ' +
+                    '총 발주금액: <strong>' + result.updated.총_발주금액.toLocaleString() + '원</strong><br>' +
+                    '남은 HITL: <strong>' + result.updated.남은_HITL건수 + '건</strong>' +
+                    '</div>' +
+                    '<button onclick="document.getElementById(\\'hitl-result-modal\\').remove()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium transition">확인</button>' +
+                    '</div>' +
+                    '</div>';
+            } else {
+                modal.innerHTML = 
+                    '<div class="bg-white rounded-xl shadow-2xl p-6 max-w-md mx-4">' +
+                    '<div class="text-center">' +
+                    '<div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">' +
+                    '<i class="fas fa-times-circle text-4xl text-red-500"></i>' +
+                    '</div>' +
+                    '<h3 class="text-xl font-bold text-gray-800 mb-2">❌ 반려 처리 완료</h3>' +
+                    '<div class="text-sm text-gray-600 mb-4">' +
+                    '남은 HITL: <strong>' + result.updated.남은_HITL건수 + '건</strong> | ' +
+                    '검토취소: <strong>' + result.updated.검토취소건수 + '건</strong>' +
+                    '</div>' +
+                    '<button onclick="document.getElementById(\\'hitl-result-modal\\').remove()" class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg font-medium transition">확인</button>' +
+                    '</div>' +
+                    '</div>';
+            }
+            
+            document.body.appendChild(modal);
+            
+            // 3초 후 자동 닫힘
+            setTimeout(() => {
+                const m = document.getElementById('hitl-result-modal');
+                if (m) m.remove();
+            }, 5000);
+        }
+        
+        // 상태 새로고침
+        async function refreshState() {
+            try {
+                const response = await fetch('/api/integrated/state');
+                const data = await response.json();
+                if (data.state) {
+                    currentState = data.state;
+                }
+            } catch (error) {
+                console.error('상태 새로고침 실패:', error);
+            }
         }
 
         function renderPhase1Table() {
