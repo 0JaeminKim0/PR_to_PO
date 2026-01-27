@@ -1012,12 +1012,12 @@ app.get('/', (c) => {
         <!-- 순차적 결과 표시 영역 (Step별 완료 후 나타남) -->
         <!-- =============================================== -->
         
-        <!-- Phase 1 결과 (Step 1 완료 후 표시) -->
+        <!-- PR 검토 결과 (PR 검토 및 발주 방식 판단 완료 후 표시) -->
         <section id="phase1-inline-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
             <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 px-4 py-3 flex items-center justify-between">
                 <div class="flex items-center space-x-2 text-white">
                     <i class="fas fa-search"></i>
-                    <span class="font-semibold">Step 1 완료: PR 검토 결과</span>
+                    <span class="font-semibold">PR 검토 및 발주 방식 판단 결과</span>
                 </div>
                 <div class="flex items-center space-x-4 text-white text-sm">
                     <span>물량검토: <strong id="p1i-review">0</strong>건</span>
@@ -1044,12 +1044,12 @@ app.get('/', (c) => {
             </div>
         </section>
         
-        <!-- 협력사 물량검토 현황판 (Step 2 완료 후 표시) -->
+        <!-- 협력사 물량검토 현황판 (협력사 물량검토 요청 완료 후 표시) -->
         <section id="company-status-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
             <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-3 flex items-center justify-between">
                 <div class="flex items-center space-x-2 text-white">
                     <i class="fas fa-industry"></i>
-                    <span class="font-semibold">Step 2 완료: 협력사 물량검토 현황</span>
+                    <span class="font-semibold">협력사 물량검토 현황</span>
                 </div>
                 <div class="text-white text-sm">
                     요청 완료: <strong id="cs-total-request">0</strong>건
@@ -1074,12 +1074,12 @@ app.get('/', (c) => {
             </div>
         </section>
         
-        <!-- Phase 2 결과 (Step 4 완료 후 표시) -->
+        <!-- 물량검토 검증 결과 (협력사 물량검토 결과 검증 완료 후 표시) -->
         <section id="phase2-inline-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
             <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 flex items-center justify-between">
                 <div class="flex items-center space-x-2 text-white">
                     <i class="fas fa-check-double"></i>
-                    <span class="font-semibold">Step 4 완료: 물량검토 검증 결과</span>
+                    <span class="font-semibold">협력사 물량검토 결과 검증</span>
                 </div>
                 <div class="flex items-center space-x-4 text-white text-sm">
                     <span>확정: <strong id="p2i-confirmed">0</strong>건</span>
@@ -1124,11 +1124,11 @@ app.get('/', (c) => {
             
             <!-- 통계 카드 -->
             <div class="grid grid-cols-2 gap-6 mb-6">
-                <!-- Phase 1 통계 -->
+                <!-- PR 검토 결과 통계 -->
                 <div class="bg-white rounded-xl shadow-md p-6">
                     <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
                         <i class="fas fa-search mr-2 text-indigo-600"></i>
-                        Phase 1: PR 검토 결과
+                        PR 검토 및 발주 방식 판단 결과
                     </h3>
                     <div class="grid grid-cols-3 gap-4">
                         <div class="stat-card bg-gray-50 rounded-lg p-4 text-center">
@@ -1156,11 +1156,11 @@ app.get('/', (c) => {
                     </div>
                 </div>
                 
-                <!-- Phase 2 통계 -->
+                <!-- 물량검토 검증 결과 통계 -->
                 <div class="bg-white rounded-xl shadow-md p-6">
                     <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
                         <i class="fas fa-check-double mr-2 text-purple-600"></i>
-                        Phase 2: 물량검토 검증 결과
+                        협력사 물량검토 결과 검증
                     </h3>
                     <div class="grid grid-cols-4 gap-3">
                         <div class="stat-card bg-gray-50 rounded-lg p-3 text-center">
@@ -1228,10 +1228,10 @@ app.get('/', (c) => {
             <div class="bg-white rounded-xl shadow-md overflow-hidden">
                 <div class="flex border-b">
                     <button id="tab-phase1-results" class="flex-1 py-3 px-4 text-center font-medium text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50">
-                        Phase 1 결과 (PR 분석)
+                        PR 검토 결과
                     </button>
                     <button id="tab-phase2-results" class="flex-1 py-3 px-4 text-center font-medium text-gray-500 hover:bg-gray-50">
-                        Phase 2 결과 (물량검토 검증)
+                        물량검토 검증 결과
                     </button>
                 </div>
                 
@@ -1278,7 +1278,7 @@ app.get('/', (c) => {
             <div class="inline-block p-8 bg-white rounded-2xl shadow-lg">
                 <i class="fas fa-rocket text-6xl text-indigo-500 mb-4"></i>
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">전체 실행 준비 완료</h2>
-                <p class="text-gray-500 mb-6">버튼을 클릭하면 Step 1~5가 자동으로 연속 실행됩니다</p>
+                <p class="text-gray-500 mb-6">버튼을 클릭하면 전체 Work Process가 자동으로 연속 실행됩니다</p>
                 <div class="flex justify-center space-x-8 text-sm text-gray-600">
                     <div class="flex items-center">
                         <i class="fas fa-database mr-2 text-indigo-500"></i>
