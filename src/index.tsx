@@ -1539,19 +1539,135 @@ app.get('/', (c) => {
                 
                 if (hitlType === '협상필요') {
                     const price = item.변경요청단가 || 0;
-                    additionalInfo = '\n                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">\n                        <div class="flex items-center mb-2">\n                            <i class="fas fa-won-sign text-orange-500 mr-2"></i>\n                            <span class="font-semibold text-orange-800">요청단가</span>\n                        </div>\n                        <div class="text-2xl font-bold text-orange-600">' + price.toLocaleString() + '원</div>\n                        <div class="text-xs text-orange-500 mt-1">공급사가 단가 협상을 요청했습니다</div>\n                    </div>';
+                    additionalInfo = '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">' +
+                        '<div class="flex items-center mb-2">' +
+                        '<i class="fas fa-won-sign text-orange-500 mr-2"></i>' +
+                        '<span class="font-semibold text-orange-800">요청단가</span>' +
+                        '</div>' +
+                        '<div class="text-2xl font-bold text-orange-600">' + price.toLocaleString() + '원</div>' +
+                        '<div class="text-xs text-orange-500 mt-1">공급사가 단가 협상을 요청했습니다</div>' +
+                        '</div>';
                 } else if (hitlType === 'Vision불일치') {
                     const llm = item.LLM_추론 || {};
                     const llmType = llm.추론_단가유형 || '-';
                     const confidence = llm.신뢰도 || '중간';
                     const reasons = llm.판단근거 || [];
+                    const confClass = confidence === '높음' ? 'bg-green-100 text-green-800' : confidence === '중간' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800';
+                    const reasonsHtml = reasons.map(function(r) { return '<li>' + r + '</li>'; }).join('');
                     
-                    additionalInfo = '\n                    <div class="bg-red-50 border border-red-200 rounded-lg p-3">\n                        <div class="flex items-center mb-2">\n                            <i class="fas fa-balance-scale text-red-500 mr-2"></i>\n                            <span class="font-semibold text-red-800">코드 비교</span>\n                        </div>\n                        <div class="flex items-center space-x-4 mb-3">\n                            <div class="flex-1 bg-white rounded p-2 text-center">\n                                <div class="text-xs text-gray-500">공급사 요청</div>\n                                <div class="text-xl font-bold text-red-600">' + (item.변경요청코드 || '-') + '</div>\n                            </div>\n                            <div class="text-gray-400"><i class="fas fa-not-equal"></i></div>\n                            <div class="flex-1 bg-white rounded p-2 text-center">\n                                <div class="text-xs text-gray-500">LLM 분석</div>\n                                <div class="text-xl font-bold text-blue-600">' + llmType + '</div>\n                            </div>\n                        </div>\n                        <div class="text-sm">\n                            <div class="flex items-center mb-1">\n                                <span class="text-gray-600">신뢰도:</span>\n                                <span class="ml-2 px-2 py-0.5 rounded text-xs ' + (confidence === '높음' ? 'bg-green-100 text-green-800' : confidence === '중간' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') + '">' + confidence + '</span>\n                            </div>\n                            <div class="text-xs text-gray-600 mt-2">\n                                <div class="font-medium mb-1">판단 근거:</div>\n                                <ul class="list-disc list-inside space-y-0.5">' + reasons.map(r => '<li>' + r + '</li>').join('') + '</ul>\n                            </div>\n                        </div>\n                    </div>';
+                    additionalInfo = '<div class="bg-red-50 border border-red-200 rounded-lg p-3">' +
+                        '<div class="flex items-center mb-2">' +
+                        '<i class="fas fa-balance-scale text-red-500 mr-2"></i>' +
+                        '<span class="font-semibold text-red-800">코드 비교</span>' +
+                        '</div>' +
+                        '<div class="flex items-center space-x-4 mb-3">' +
+                        '<div class="flex-1 bg-white rounded p-2 text-center">' +
+                        '<div class="text-xs text-gray-500">공급사 요청</div>' +
+                        '<div class="text-xl font-bold text-red-600">' + (item.변경요청코드 || '-') + '</div>' +
+                        '</div>' +
+                        '<div class="text-gray-400"><i class="fas fa-not-equal"></i></div>' +
+                        '<div class="flex-1 bg-white rounded p-2 text-center">' +
+                        '<div class="text-xs text-gray-500">LLM 분석</div>' +
+                        '<div class="text-xl font-bold text-blue-600">' + llmType + '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="text-sm">' +
+                        '<div class="flex items-center mb-1">' +
+                        '<span class="text-gray-600">신뢰도:</span>' +
+                        '<span class="ml-2 px-2 py-0.5 rounded text-xs ' + confClass + '">' + confidence + '</span>' +
+                        '</div>' +
+                        '<div class="text-xs text-gray-600 mt-2">' +
+                        '<div class="font-medium mb-1">판단 근거:</div>' +
+                        '<ul class="list-disc list-inside space-y-0.5">' + reasonsHtml + '</ul>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>';
                 } else if (hitlType === '도면없음') {
-                    additionalInfo = '\n                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">\n                        <div class="flex items-center mb-2">\n                            <i class="fas fa-exchange-alt text-gray-500 mr-2"></i>\n                            <span class="font-semibold text-gray-800">유형코드 변경</span>\n                        </div>\n                        <div class="flex items-center justify-center space-x-4">\n                            <div class="text-center">\n                                <div class="text-xs text-gray-500">변경 전</div>\n                                <div class="text-2xl font-bold text-gray-600">' + (item.현재유형코드 || '-') + '</div>\n                            </div>\n                            <div class="text-2xl text-gray-400"><i class="fas fa-arrow-right"></i></div>\n                            <div class="text-center">\n                                <div class="text-xs text-gray-500">변경 후</div>\n                                <div class="text-2xl font-bold text-indigo-600">' + (item.변경요청코드 || '-') + '</div>\n                            </div>\n                        </div>\n                        <div class="text-xs text-gray-500 mt-2 text-center">도면 정보가 없어 자동 검증 불가</div>\n                    </div>';
+                    additionalInfo = '<div class="bg-gray-50 border border-gray-200 rounded-lg p-3">' +
+                        '<div class="flex items-center mb-2">' +
+                        '<i class="fas fa-exchange-alt text-gray-500 mr-2"></i>' +
+                        '<span class="font-semibold text-gray-800">유형코드 변경</span>' +
+                        '</div>' +
+                        '<div class="flex items-center justify-center space-x-4">' +
+                        '<div class="text-center">' +
+                        '<div class="text-xs text-gray-500">변경 전</div>' +
+                        '<div class="text-2xl font-bold text-gray-600">' + (item.현재유형코드 || '-') + '</div>' +
+                        '</div>' +
+                        '<div class="text-2xl text-gray-400"><i class="fas fa-arrow-right"></i></div>' +
+                        '<div class="text-center">' +
+                        '<div class="text-xs text-gray-500">변경 후</div>' +
+                        '<div class="text-2xl font-bold text-indigo-600">' + (item.변경요청코드 || '-') + '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="text-xs text-gray-500 mt-2 text-center">도면 정보가 없어 자동 검증 불가</div>' +
+                        '</div>';
                 }
                 
-                return '\n                <div class="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition">\n                    <!-- 카드 헤더 -->\n                    <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b">\n                        <div class="flex items-center space-x-3">\n                            <span class="px-3 py-1 rounded-full text-xs font-medium ' + typeBadgeClass + '">\n                                <i class="' + typeIcon + ' mr-1"></i>' + hitlType + '\n                            </span>\n                            <span class="text-xs text-gray-500">' + item.검토구분 + '</span>\n                        </div>\n                        <div class="flex space-x-2">\n                            <button class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">\n                                <i class="fas fa-check mr-1"></i>확정\n                            </button>\n                            <button class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">\n                                <i class="fas fa-times mr-1"></i>반려\n                            </button>\n                            <button class="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">\n                                <i class="fas fa-image mr-1"></i>도면보기\n                            </button>\n                        </div>\n                    </div>\n                    \n                    <!-- 카드 본문 -->\n                    <div class="p-4">\n                        <!-- PR 정보 그리드 -->\n                        <div class="grid grid-cols-2 gap-4 mb-4">\n                            <div class="space-y-2">\n                                <div>\n                                    <label class="text-xs text-gray-500">자재번호</label>\n                                    <div class="font-mono text-sm font-medium text-gray-800">' + (item.자재번호 || '-') + '</div>\n                                </div>\n                                <div>\n                                    <label class="text-xs text-gray-500">자재내역</label>\n                                    <div class="text-sm text-gray-700 truncate" title="' + (item.자재내역 || '') + '">' + (item.자재내역 || '-').substring(0, 50) + (item.자재내역?.length > 50 ? '...' : '') + '</div>\n                                </div>\n                                <div>\n                                    <label class="text-xs text-gray-500">업체명</label>\n                                    <div class="text-sm text-gray-700">' + (item.업체명 || '-') + '</div>\n                                </div>\n                            </div>\n                            <div class="space-y-2">\n                                <div class="flex space-x-4">\n                                    <div>\n                                        <label class="text-xs text-gray-500">현재유형코드</label>\n                                        <div class="text-lg font-bold text-gray-700">' + (item.현재유형코드 || '-') + '</div>\n                                    </div>\n                                    <div>\n                                        <label class="text-xs text-gray-500">변경요청코드</label>\n                                        <div class="text-lg font-bold text-indigo-600">' + (item.변경요청코드 || '-') + '</div>\n                                    </div>\n                                </div>\n                                <div>\n                                    <label class="text-xs text-gray-500">도면번호</label>\n                                    <div class="text-sm text-gray-700 font-mono">' + (item.도면번호 || '-') + '</div>\n                                </div>\n                            </div>\n                        </div>\n                        \n                        <!-- HITL 유형별 추가 정보 -->' + additionalInfo + '\n                        \n                        <!-- 검증 근거 -->\n                        <div class="mt-4 bg-blue-50 rounded-lg p-3">\n                            <div class="flex items-center mb-1">\n                                <i class="fas fa-info-circle text-blue-500 mr-2"></i>\n                                <span class="text-xs font-medium text-blue-800">검증 근거</span>\n                            </div>\n                            <div class="text-sm text-blue-700">' + (item.검증근거 || '-') + '</div>\n                        </div>\n                    </div>\n                </div>';
+                const 자재내역Text = (item.자재내역 || '-').substring(0, 50) + ((item.자재내역 && item.자재내역.length > 50) ? '...' : '');
+                
+                return '<div class="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition">' +
+                    '<div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b">' +
+                    '<div class="flex items-center space-x-3">' +
+                    '<span class="px-3 py-1 rounded-full text-xs font-medium ' + typeBadgeClass + '">' +
+                    '<i class="' + typeIcon + ' mr-1"></i>' + hitlType +
+                    '</span>' +
+                    '<span class="text-xs text-gray-500">' + item.검토구분 + '</span>' +
+                    '</div>' +
+                    '<div class="flex space-x-2">' +
+                    '<button class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">' +
+                    '<i class="fas fa-check mr-1"></i>확정' +
+                    '</button>' +
+                    '<button class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">' +
+                    '<i class="fas fa-times mr-1"></i>반려' +
+                    '</button>' +
+                    '<button class="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled title="PoC - 기능 비활성화">' +
+                    '<i class="fas fa-image mr-1"></i>도면보기' +
+                    '</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="p-4">' +
+                    '<div class="grid grid-cols-2 gap-4 mb-4">' +
+                    '<div class="space-y-2">' +
+                    '<div>' +
+                    '<label class="text-xs text-gray-500">자재번호</label>' +
+                    '<div class="font-mono text-sm font-medium text-gray-800">' + (item.자재번호 || '-') + '</div>' +
+                    '</div>' +
+                    '<div>' +
+                    '<label class="text-xs text-gray-500">자재내역</label>' +
+                    '<div class="text-sm text-gray-700 truncate" title="' + (item.자재내역 || '') + '">' + 자재내역Text + '</div>' +
+                    '</div>' +
+                    '<div>' +
+                    '<label class="text-xs text-gray-500">업체명</label>' +
+                    '<div class="text-sm text-gray-700">' + (item.업체명 || '-') + '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="space-y-2">' +
+                    '<div class="flex space-x-4">' +
+                    '<div>' +
+                    '<label class="text-xs text-gray-500">현재유형코드</label>' +
+                    '<div class="text-lg font-bold text-gray-700">' + (item.현재유형코드 || '-') + '</div>' +
+                    '</div>' +
+                    '<div>' +
+                    '<label class="text-xs text-gray-500">변경요청코드</label>' +
+                    '<div class="text-lg font-bold text-indigo-600">' + (item.변경요청코드 || '-') + '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div>' +
+                    '<label class="text-xs text-gray-500">도면번호</label>' +
+                    '<div class="text-sm text-gray-700 font-mono">' + (item.도면번호 || '-') + '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    (additionalInfo ? '<div class="mb-4">' + additionalInfo + '</div>' : '') +
+                    '<div class="bg-blue-50 rounded-lg p-3">' +
+                    '<div class="flex items-center mb-1">' +
+                    '<i class="fas fa-info-circle text-blue-500 mr-2"></i>' +
+                    '<span class="text-xs font-medium text-blue-800">검증 근거</span>' +
+                    '</div>' +
+                    '<div class="text-sm text-blue-700">' + (item.검증근거 || '-') + '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
             }).join('');
         }
 
