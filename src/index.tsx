@@ -27,6 +27,7 @@ const PAINTING_COMPANY_MAP: Record<string, string> = {
 // Phase 1 결과 타입 (배치)
 type Phase1BatchResult = {
   자재번호: string
+  PR_NO?: string  // 대표PR 번호 추가
   계약단가존재: string
   계약단가_근거: string
   유형코드: string
@@ -50,6 +51,7 @@ type Phase1BatchResult = {
 // Phase 2 결과 타입 (배치) - HITL 화면 개선을 위해 확장
 type Phase2BatchResult = {
   자재번호: string
+  PR_NO?: string  // 대표PR 번호 추가
   검토구분: string
   검증결과: string
   권장조치: string
@@ -409,6 +411,7 @@ app.post('/api/integrated/run-all', async (c) => {
       
       return {
         ...result,
+        PR_NO: pr['대표PR'] || pr['PR'] || '',
         자재내역: pr['자재내역'],
         자재속성: pr['자재속성'],
         재질: pr['재질'],
@@ -492,8 +495,10 @@ app.post('/api/integrated/run-all', async (c) => {
     
     // 1. 단가유형미변경 - 일괄 자동 확정
     for (const review of unchanged) {
+      const prInfo = phase1Results.find((p: Phase1BatchResult) => p.자재번호 === review['자재번호'])
       phase2Results.push({
         자재번호: review['자재번호'],
+        PR_NO: prInfo?.PR_NO || review['PR'] || '',
         검토구분: '단가유형미변경',
         검증결과: '적합',
         권장조치: '확정',
@@ -503,8 +508,10 @@ app.post('/api/integrated/run-all', async (c) => {
     
     // 2. 제작불가 - 일괄 자동 취소
     for (const review of impossible) {
+      const prInfo = phase1Results.find((p: Phase1BatchResult) => p.자재번호 === review['자재번호'])
       phase2Results.push({
         자재번호: review['자재번호'],
+        PR_NO: prInfo?.PR_NO || review['PR'] || '',
         검토구분: '제작불가',
         검증결과: '해당없음',
         권장조치: '검토취소',
@@ -520,6 +527,7 @@ app.post('/api/integrated/run-all', async (c) => {
       
       phase2Results.push({
         자재번호: review['자재번호'],
+        PR_NO: prInfo?.PR_NO || review['PR'] || '',
         검토구분: '협상필요',
         검증결과: '검토필요',
         권장조치: 'HITL',
@@ -552,6 +560,7 @@ app.post('/api/integrated/run-all', async (c) => {
       
       // 공통 PR/Review 정보
       const commonInfo = {
+        PR_NO: prInfo?.PR_NO || review['PR'] || '',
         자재내역: prInfo?.자재내역 || review['자재내역'],
         현재유형코드: currentType,
         변경요청코드: changeType,
@@ -907,7 +916,6 @@ app.get('/', (c) => {
                     <div class="flex items-center mb-2">
                         <span id="step-1-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">1</span>
                         <div>
-                            <h3 class="font-semibold text-sm">Step 1</h3>
                             <p class="text-xs text-gray-500">PR 검토 및 발주 방식 판단</p>
                         </div>
                     </div>
@@ -919,7 +927,6 @@ app.get('/', (c) => {
                     <div class="flex items-center mb-2">
                         <span id="step-2-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">2</span>
                         <div>
-                            <h3 class="font-semibold text-sm">Step 2</h3>
                             <p class="text-xs text-gray-500">협력사 물량검토 요청</p>
                         </div>
                     </div>
@@ -931,8 +938,7 @@ app.get('/', (c) => {
                     <div class="flex items-center mb-2">
                         <span id="step-3-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">3</span>
                         <div>
-                            <h3 class="font-semibold text-sm">Step 3</h3>
-                            <p class="text-xs text-gray-500">물량검토 결과 수신</p>
+                            <p class="text-xs text-gray-500">협력사 물량검토 결과 수신</p>
                         </div>
                     </div>
                     <p id="step-3-message" class="text-xs text-gray-400 mt-2">대기</p>
@@ -943,8 +949,7 @@ app.get('/', (c) => {
                     <div class="flex items-center mb-2">
                         <span id="step-4-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">4</span>
                         <div>
-                            <h3 class="font-semibold text-sm">Step 4</h3>
-                            <p class="text-xs text-gray-500">결과 검증 (Process 5)</p>
+                            <p class="text-xs text-gray-500">협력사 물량검토 결과 검증</p>
                         </div>
                     </div>
                     <p id="step-4-message" class="text-xs text-gray-400 mt-2">대기</p>
@@ -955,12 +960,27 @@ app.get('/', (c) => {
                     <div class="flex items-center mb-2">
                         <span id="step-5-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">5</span>
                         <div>
-                            <h3 class="font-semibold text-sm">Step 5</h3>
                             <p class="text-xs text-gray-500">최종 결과 요약</p>
                         </div>
                     </div>
                     <p id="step-5-message" class="text-xs text-gray-400 mt-2">대기</p>
                 </div>
+            </div>
+        </section>
+        
+        <!-- AI Agent 처리 로그 패널 -->
+        <section id="log-section" class="hidden bg-gray-900 rounded-xl shadow-lg mb-6 overflow-hidden">
+            <div class="bg-gray-800 px-4 py-3 flex items-center justify-between border-b border-gray-700">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-robot text-green-400"></i>
+                    <span class="text-white font-medium text-sm">AI Agent 처리 로그</span>
+                </div>
+                <button id="btn-clear-log" class="text-gray-400 hover:text-white text-xs">
+                    <i class="fas fa-trash mr-1"></i>로그 지우기
+                </button>
+            </div>
+            <div id="log-container" class="h-64 overflow-y-auto p-4 font-mono text-xs leading-relaxed scrollbar-thin" style="scrollbar-color: #4B5563 #1F2937;">
+                <div class="text-gray-500">로그가 여기에 표시됩니다...</div>
             </div>
         </section>
 
@@ -1099,7 +1119,7 @@ app.get('/', (c) => {
                         <thead>
                             <tr>
                                 <th>자재번호</th>
-                                <th>자재내역</th>
+                                <th>PR NO</th>
                                 <th>계약단가</th>
                                 <th>유형코드</th>
                                 <th>적정성</th>
@@ -1118,6 +1138,7 @@ app.get('/', (c) => {
                         <thead>
                             <tr>
                                 <th>자재번호</th>
+                                <th>PR NO</th>
                                 <th>검토구분</th>
                                 <th>검증결과</th>
                                 <th>권장조치</th>
@@ -1178,6 +1199,58 @@ app.get('/', (c) => {
         const tabPhase2Results = document.getElementById('tab-phase2-results');
         const phase1ResultsContent = document.getElementById('phase1-results-content');
         const phase2ResultsContent = document.getElementById('phase2-results-content');
+        
+        // Log elements
+        const logSection = document.getElementById('log-section');
+        const logContainer = document.getElementById('log-container');
+        const btnClearLog = document.getElementById('btn-clear-log');
+
+        // ====================================================================
+        // Log Functions
+        // ====================================================================
+        function getTimestamp() {
+            const now = new Date();
+            return now.toTimeString().substring(0, 8);
+        }
+        
+        function addLog(message, type = 'info', indent = 0) {
+            const timestamp = getTimestamp();
+            const indentStr = indent > 0 ? '&nbsp;&nbsp;'.repeat(indent) + '└ ' : '';
+            
+            let colorClass = 'text-gray-300';
+            let icon = '';
+            
+            if (type === 'success') {
+                colorClass = 'text-green-400';
+                icon = '✅ ';
+            } else if (type === 'warning') {
+                colorClass = 'text-yellow-400';
+                icon = '⚠️ ';
+            } else if (type === 'error') {
+                colorClass = 'text-red-400';
+                icon = '❌ ';
+            } else if (type === 'processing') {
+                colorClass = 'text-blue-400';
+                icon = '🔍 ';
+            } else if (type === 'header') {
+                colorClass = 'text-white font-semibold';
+            } else if (type === 'divider') {
+                logContainer.innerHTML += '<div class="text-gray-600 my-2">────────────────────────────────────────────────</div>';
+                return;
+            }
+            
+            const logEntry = '<div class="' + colorClass + '">' +
+                '<span class="text-gray-500">[' + timestamp + ']</span> ' +
+                indentStr + icon + message +
+                '</div>';
+            
+            logContainer.innerHTML += logEntry;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        function clearLog() {
+            logContainer.innerHTML = '<div class="text-gray-500">로그가 여기에 표시됩니다...</div>';
+        }
 
         // ====================================================================
         // Initialize
@@ -1203,6 +1276,7 @@ app.get('/', (c) => {
             btnRunAll.addEventListener('click', runAll);
             btnRunAllCenter.addEventListener('click', runAll);
             btnReset.addEventListener('click', resetAll);
+            btnClearLog.addEventListener('click', clearLog);
             
             tabPhase1Results.addEventListener('click', () => switchResultTab('phase1'));
             tabPhase2Results.addEventListener('click', () => switchResultTab('phase2'));
@@ -1221,6 +1295,10 @@ app.get('/', (c) => {
             initialSection.classList.add('hidden');
             summarySection.classList.add('hidden');
             
+            // 로그 패널 표시 및 초기화
+            logSection.classList.remove('hidden');
+            clearLog();
+            
             // Step 초기화
             for (let i = 1; i <= 5; i++) {
                 updateStepUI(i, 'pending', '대기');
@@ -1232,6 +1310,10 @@ app.get('/', (c) => {
                 // Step 1 시작
                 updateStepUI(1, 'processing', 'PR 검토 및 발주 방식 판단 중... (배치 LLM 호출)');
                 updateProgressBar(10);
+                
+                addLog('PR 검토 및 발주 방식 판단 시작', 'header');
+                addLog('분석 대상: 20건', 'info', 1);
+                addLog('PR 자재별 계약 여부 판별 중...', 'info', 1);
                 
                 const response = await fetch('/api/integrated/run-all', { method: 'POST' });
                 const result = await response.json();
@@ -1250,6 +1332,7 @@ app.get('/', (c) => {
             } catch (error) {
                 console.error('Error:', error);
                 overallStatus.textContent = '오류 발생: ' + error.message;
+                addLog('오류 발생: ' + error.message, 'error');
                 const currentStep = currentState?.currentStep || 1;
                 updateStepUI(currentStep, 'error', '오류: ' + error.message);
             }
@@ -1260,7 +1343,15 @@ app.get('/', (c) => {
         }
 
         async function animateSteps(state) {
-            // Step 1
+            // Step 1 완료 로그
+            addLog('철의장유형코드 검증/수정 중...', 'info', 1);
+            await sleep(200);
+            addLog('도장사 경유 및 지정 중...', 'info', 1);
+            await sleep(200);
+            addLog('발주 방식 결정 중...', 'info', 1);
+            await sleep(200);
+            addLog('분석 완료: ' + state.phase1Results.length + '건', 'success', 1);
+            
             updateStepUI(1, 'completed', 
                 '분석 완료: ' + state.steps.step1.data.물량검토대상 + '건 물량검토, ' + 
                 state.steps.step1.data.유형코드_부적정 + '건 유형코드 부적정'
@@ -1269,8 +1360,19 @@ app.get('/', (c) => {
             await sleep(300);
             
             // Step 2
+            addLog('', 'divider');
+            addLog('협력사 물량검토 요청', 'header');
+            addLog('물량검토 대상: ' + state.steps.step2.data.총요청건수 + '건', 'info', 1);
+            
             updateStepUI(2, 'processing', '협력사 물량검토 요청 중...');
-            await sleep(500);
+            
+            // 협력사별 요청 로그
+            const companies = state.steps.step2.data.협력사별 || {};
+            for (const company in companies) {
+                await sleep(150);
+                addLog(company + ': ' + companies[company] + '건 → 요청 완료', 'success', 1);
+            }
+            
             updateStepUI(2, 'completed', 
                 '요청 완료: ' + state.steps.step2.data.총요청건수 + '건'
             );
@@ -1278,8 +1380,19 @@ app.get('/', (c) => {
             await sleep(300);
             
             // Step 3
+            addLog('', 'divider');
+            addLog('협력사 물량검토 결과 수신', 'header');
             updateStepUI(3, 'processing', '결과 수신 중...');
-            await sleep(500);
+            await sleep(300);
+            
+            addLog('📥 수신 완료: ' + state.steps.step3.data.총수신건수 + '건', 'info', 1);
+            
+            // 검토구분별 로그
+            const reviewTypes = state.steps.step3.data.검토구분별 || {};
+            for (const type in reviewTypes) {
+                addLog(type + ': ' + reviewTypes[type] + '건', 'info', 1);
+            }
+            
             updateStepUI(3, 'completed', 
                 '수신 완료: ' + state.steps.step3.data.총수신건수 + '건'
             );
@@ -1287,8 +1400,54 @@ app.get('/', (c) => {
             await sleep(300);
             
             // Step 4
+            addLog('', 'divider');
+            addLog('협력사 물량검토 결과 검증', 'header');
+            addLog('검증 대상: ' + state.phase2Results.length + '건', 'info', 1);
+            
             updateStepUI(4, 'processing', '결과 검증 중...');
-            await sleep(500);
+            await sleep(200);
+            
+            // 검토구분별 처리 결과
+            const unchanged = state.phase2Results.filter(function(r) { return r.검토구분 === '단가유형미변경'; });
+            const impossible = state.phase2Results.filter(function(r) { return r.검토구분 === '제작불가'; });
+            const negotiation = state.phase2Results.filter(function(r) { return r.검토구분 === '협상필요'; });
+            const changed = state.phase2Results.filter(function(r) { return r.검토구분 === '단가유형변경'; });
+            
+            if (unchanged.length > 0) {
+                addLog('단가유형미변경 ' + unchanged.length + '건 → 자동 확정', 'success', 1);
+            }
+            await sleep(150);
+            
+            if (impossible.length > 0) {
+                addLog('제작불가 ' + impossible.length + '건 → 자동 취소', 'success', 1);
+            }
+            await sleep(150);
+            
+            if (negotiation.length > 0) {
+                addLog('협상필요 ' + negotiation.length + '건 → HITL', 'warning', 1);
+            }
+            await sleep(150);
+            
+            if (changed.length > 0) {
+                addLog('단가유형변경 Vision 검증 중... (' + changed.length + '건)', 'processing', 1);
+                await sleep(200);
+                
+                // 단가유형변경 상세 로그
+                for (const item of changed) {
+                    await sleep(100);
+                    const shortId = (item.자재번호 || '').substring(0, 15);
+                    if (item.권장조치 === '확정') {
+                        addLog(shortId + ': ' + (item.현재유형코드 || '-') + '→' + (item.변경요청코드 || '-') + ' 도면 일치', 'success', 2);
+                    } else if (item.HITL유형 === 'Vision불일치') {
+                        addLog(shortId + ': 공급사 \'' + (item.변경요청코드 || '-') + '\' ≠ 도면 분석 → HITL', 'error', 2);
+                    } else {
+                        addLog(shortId + ': 도면 없음 → HITL', 'warning', 2);
+                    }
+                }
+            }
+            
+            addLog('검증 완료: ' + state.phase2Results.length + '건', 'success', 1);
+            
             updateStepUI(4, 'completed', 
                 '검증 완료: ' + state.steps.step4.data.자동확정 + '건 확정, ' + 
                 state.steps.step4.data.HITL + '건 HITL'
@@ -1297,8 +1456,16 @@ app.get('/', (c) => {
             await sleep(300);
             
             // Step 5
+            addLog('', 'divider');
             updateStepUI(5, 'processing', '결과 집계 중...');
             await sleep(300);
+            
+            const autoRate = state.summary?.자동처리율 || '0.0';
+            const autoCount = (state.summary?.phase2?.확정 || 0) + (state.summary?.phase2?.검토취소 || 0);
+            const totalCount = state.summary?.phase2?.총_검증건수 || 0;
+            
+            addLog('📊 자동처리율: ' + autoCount + '/' + totalCount + '건 (' + autoRate + '%)', 'success');
+            
             updateStepUI(5, 'completed', state.steps.step5.message);
             updateProgressBar(100);
         }
@@ -1603,8 +1770,6 @@ app.get('/', (c) => {
                         '</div>';
                 }
                 
-                const 자재내역Text = (item.자재내역 || '-').substring(0, 50) + ((item.자재내역 && item.자재내역.length > 50) ? '...' : '');
-                
                 return '<div class="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition">' +
                     '<div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b">' +
                     '<div class="flex items-center space-x-3">' +
@@ -1633,8 +1798,8 @@ app.get('/', (c) => {
                     '<div class="font-mono text-sm font-medium text-gray-800">' + (item.자재번호 || '-') + '</div>' +
                     '</div>' +
                     '<div>' +
-                    '<label class="text-xs text-gray-500">자재내역</label>' +
-                    '<div class="text-sm text-gray-700 truncate" title="' + (item.자재내역 || '') + '">' + 자재내역Text + '</div>' +
+                    '<label class="text-xs text-gray-500">PR NO</label>' +
+                    '<div class="text-sm font-semibold text-indigo-600">' + (item.PR_NO || '-') + '</div>' +
                     '</div>' +
                     '<div>' +
                     '<label class="text-xs text-gray-500">업체명</label>' +
@@ -1681,7 +1846,7 @@ app.get('/', (c) => {
                 
                 return '<tr>' +
                     '<td class="font-mono">' + (item.자재번호 || '').substring(0, 18) + '...</td>' +
-                    '<td>' + (item.자재내역 || '').substring(0, 30) + '...</td>' +
+                    '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
                     '<td class="text-center font-bold ' + (item.계약단가존재 === 'Y' ? 'text-green-600' : 'text-red-600') + '">' + item.계약단가존재 + '</td>' +
                     '<td class="text-center">' + item.유형코드 + '</td>' +
                     '<td class="text-center ' + 적정성Color + '">' + item.유형코드_적정여부 + '</td>' +
@@ -1707,6 +1872,7 @@ app.get('/', (c) => {
                 
                 return '<tr>' +
                     '<td class="font-mono">' + (item.자재번호 || '').substring(0, 18) + '...</td>' +
+                    '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
                     '<td>' + item.검토구분 + '</td>' +
                     '<td class="' + 결과Color + '">' + item.검증결과 + '</td>' +
                     '<td class="text-center"><span class="px-2 py-1 rounded text-xs ' + 조치Badge + '">' + item.권장조치 + '</span></td>' +
