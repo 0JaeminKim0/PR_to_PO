@@ -1107,21 +1107,6 @@ app.get('/', (c) => {
 
         <!-- 결과 요약 섹션 (완료 시 표시) -->
         <section id="summary-section" class="hidden">
-            <!-- 자동처리율 카드 -->
-            <div class="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg p-6 mb-6 text-white">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h2 class="text-lg font-medium opacity-90">전체 프로세스 완료!</h2>
-                        <p class="text-5xl font-bold mt-2" id="auto-rate">0%</p>
-                        <p class="text-sm opacity-80 mt-1">자동처리율</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-3xl font-bold" id="auto-count">0/0건</p>
-                        <p class="text-sm opacity-80">확정 + 검토취소 / 총 검증</p>
-                    </div>
-                </div>
-            </div>
-            
             <!-- 통계 카드 -->
             <div class="grid grid-cols-2 gap-6 mb-6">
                 <!-- PR 검토 결과 통계 -->
@@ -1865,12 +1850,7 @@ app.get('/', (c) => {
             
             const summary = currentState.summary;
             
-            // 자동처리율 표시
-            document.getElementById('auto-rate').textContent = summary.자동처리율 + '%';
-            document.getElementById('auto-count').textContent = 
-                (summary.phase2.확정 + summary.phase2.검토취소) + '/' + summary.phase2.총_검증건수 + '건';
-            
-            // Phase 1 통계
+            // PR 검토 결과 통계
             document.getElementById('p1-total').textContent = summary.phase1.총_분석건수;
             document.getElementById('p1-review').textContent = summary.phase1.물량검토대상;
             document.getElementById('p1-quote').textContent = summary.phase1.견적대상;
