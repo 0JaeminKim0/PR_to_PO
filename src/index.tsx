@@ -1480,6 +1480,28 @@ app.get('/', (c) => {
             </div>
         </section>
         
+        <!-- 결과 요약 섹션 (완료 시 표시) -->
+        <section id="summary-section" class="hidden">
+            <!-- HITL 필요 건 목록 (먼저 표시) -->
+            <div id="hitl-section" class="bg-white rounded-xl shadow-md p-6 mb-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-user-cog mr-2 text-yellow-600"></i>
+                    HITL 필요 건 (<span id="hitl-count">0</span>건) - 담당자 검토 필요
+                </h3>
+                
+                <!-- HITL 유형별 필터 탭 -->
+                <div class="flex space-x-2 mb-4 border-b">
+                    <button id="hitl-filter-all" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">전체</button>
+                    <button id="hitl-filter-negotiation" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">협상필요</button>
+                    <button id="hitl-filter-vision" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Vision 불일치</button>
+                    <button id="hitl-filter-nodrawing" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">도면 없음</button>
+                </div>
+                
+                <div id="hitl-list" class="space-y-4 max-h-[600px] overflow-y-auto scrollbar-thin">
+                </div>
+            </div>
+        </section>
+        
         <!-- PO 자동 생성 결과 (PO 자동 생성 완료 후 표시) -->
         <section id="po-generation-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
             <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex items-center justify-between">
@@ -1507,76 +1529,6 @@ app.get('/', (c) => {
                     <tbody id="po-table-body">
                     </tbody>
                 </table>
-            </div>
-        </section>
-        
-        <!-- 결과 요약 섹션 (완료 시 표시) -->
-        <section id="summary-section" class="hidden">
-            <!-- HITL 필요 건 목록 -->
-            <div id="hitl-section" class="bg-white rounded-xl shadow-md p-6 mb-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-user-cog mr-2 text-yellow-600"></i>
-                    HITL 필요 건 (<span id="hitl-count">0</span>건) - 담당자 검토 필요
-                </h3>
-                
-                <!-- HITL 유형별 필터 탭 -->
-                <div class="flex space-x-2 mb-4 border-b">
-                    <button id="hitl-filter-all" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">전체</button>
-                    <button id="hitl-filter-negotiation" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">협상필요</button>
-                    <button id="hitl-filter-vision" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Vision 불일치</button>
-                    <button id="hitl-filter-nodrawing" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">도면 없음</button>
-                </div>
-                
-                <div id="hitl-list" class="space-y-4 max-h-[600px] overflow-y-auto scrollbar-thin">
-                </div>
-            </div>
-            
-            <!-- 상세 결과 탭 -->
-            <div class="bg-white rounded-xl shadow-md overflow-hidden">
-                <div class="flex border-b">
-                    <button id="tab-phase1-results" class="flex-1 py-3 px-4 text-center font-medium text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50">
-                        PR 검토 결과
-                    </button>
-                    <button id="tab-phase2-results" class="flex-1 py-3 px-4 text-center font-medium text-gray-500 hover:bg-gray-50">
-                        물량검토 검증 결과
-                    </button>
-                </div>
-                
-                <div id="phase1-results-content" class="p-4 max-h-96 overflow-auto scrollbar-thin">
-                    <table class="result-table w-full text-xs">
-                        <thead>
-                            <tr>
-                                <th>자재번호</th>
-                                <th>PR NO</th>
-                                <th>계약단가</th>
-                                <th>유형코드</th>
-                                <th>적정성</th>
-                                <th>권장코드</th>
-                                <th>도장경유</th>
-                                <th>최종분류</th>
-                            </tr>
-                        </thead>
-                        <tbody id="phase1-table-body">
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div id="phase2-results-content" class="hidden p-4 max-h-96 overflow-auto scrollbar-thin">
-                    <table class="result-table w-full text-xs">
-                        <thead>
-                            <tr>
-                                <th>자재번호</th>
-                                <th>PR NO</th>
-                                <th>검토구분</th>
-                                <th>검증결과</th>
-                                <th>권장조치</th>
-                                <th>검증근거</th>
-                            </tr>
-                        </thead>
-                        <tbody id="phase2-table-body">
-                        </tbody>
-                    </table>
-                </div>
             </div>
         </section>
 
@@ -1621,12 +1573,6 @@ app.get('/', (c) => {
         const overallStatus = document.getElementById('overall-status');
         const initialSection = document.getElementById('initial-section');
         const summarySection = document.getElementById('summary-section');
-        
-        // Tab elements
-        const tabPhase1Results = document.getElementById('tab-phase1-results');
-        const tabPhase2Results = document.getElementById('tab-phase2-results');
-        const phase1ResultsContent = document.getElementById('phase1-results-content');
-        const phase2ResultsContent = document.getElementById('phase2-results-content');
         
         // Log elements
         const logSection = document.getElementById('log-section');
@@ -1705,9 +1651,6 @@ app.get('/', (c) => {
             btnRunAllCenter.addEventListener('click', runAll);
             btnReset.addEventListener('click', resetAll);
             btnClearLog.addEventListener('click', clearLog);
-            
-            tabPhase1Results.addEventListener('click', () => switchResultTab('phase1'));
-            tabPhase2Results.addEventListener('click', () => switchResultTab('phase2'));
         }
 
         // ====================================================================
@@ -2345,10 +2288,6 @@ app.get('/', (c) => {
             // HITL 목록
             renderHitlList();
             
-            // 상세 결과 테이블
-            renderPhase1Table();
-            renderPhase2Table();
-            
             summarySection.classList.remove('hidden');
         }
 
@@ -2611,9 +2550,6 @@ app.get('/', (c) => {
                             // PO 테이블 재렌더링
                             renderPOTable();
                             
-                            // Phase2 테이블도 재렌더링
-                            renderPhase2Table();
-                            
                             // Step5, Step6 UI 업데이트
                             updateStepStatus(5, currentState.steps.step5);
                             updateStepStatus(6, currentState.steps.step6);
@@ -2663,9 +2599,6 @@ app.get('/', (c) => {
                             
                             // HITL 목록 재렌더링
                             renderHitlList();
-                            
-                            // Phase2 테이블도 재렌더링
-                            renderPhase2Table();
                             
                             // Step6 UI 업데이트
                             updateStepStatus(6, currentState.steps.step6);
@@ -2749,68 +2682,6 @@ app.get('/', (c) => {
                 }
             } catch (error) {
                 console.error('상태 새로고침 실패:', error);
-            }
-        }
-
-        function renderPhase1Table() {
-            const tbody = document.getElementById('phase1-table-body');
-            const p1 = currentState.phase1Results;
-            
-            tbody.innerHTML = p1.map(item => {
-                const 분류Badge = item.최종분류?.includes('물량검토') ? 'badge-물량검토' : 'badge-견적대상';
-                const 적정성Color = item.유형코드_적정여부 === 'Y' ? 'text-green-600' : 'text-red-600';
-                
-                return '<tr>' +
-                    '<td class="font-mono">' + (item.자재번호 || '').substring(0, 18) + '...</td>' +
-                    '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
-                    '<td class="text-center font-bold ' + (item.계약단가존재 === 'Y' ? 'text-green-600' : 'text-red-600') + '">' + item.계약단가존재 + '</td>' +
-                    '<td class="text-center">' + item.유형코드 + '</td>' +
-                    '<td class="text-center ' + 적정성Color + '">' + item.유형코드_적정여부 + '</td>' +
-                    '<td class="text-center text-indigo-600">' + (item.권장코드 || '-') + '</td>' +
-                    '<td class="text-center">' + item.도장사경유 + '</td>' +
-                    '<td class="text-center"><span class="px-2 py-1 rounded text-xs ' + 분류Badge + '">' + item.최종분류 + '</span></td>' +
-                '</tr>';
-            }).join('');
-        }
-
-        function renderPhase2Table() {
-            const tbody = document.getElementById('phase2-table-body');
-            const p2 = currentState.phase2Results;
-            
-            tbody.innerHTML = p2.map(item => {
-                let 조치Badge = 'badge-HITL';
-                if (item.권장조치 === '확정') 조치Badge = 'badge-확정';
-                else if (item.권장조치 === '검토취소') 조치Badge = 'badge-검토취소';
-                
-                let 결과Color = 'text-yellow-600';
-                if (item.검증결과 === '적합') 결과Color = 'text-green-600';
-                else if (item.검증결과 === '부적합') 결과Color = 'text-red-600';
-                
-                return '<tr>' +
-                    '<td class="font-mono">' + (item.자재번호 || '').substring(0, 18) + '...</td>' +
-                    '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
-                    '<td>' + item.검토구분 + '</td>' +
-                    '<td class="' + 결과Color + '">' + item.검증결과 + '</td>' +
-                    '<td class="text-center"><span class="px-2 py-1 rounded text-xs ' + 조치Badge + '">' + item.권장조치 + '</span></td>' +
-                    '<td class="text-xs text-gray-600">' + item.검증근거 + '</td>' +
-                '</tr>';
-            }).join('');
-        }
-
-        // ====================================================================
-        // Tab Switching
-        // ====================================================================
-        function switchResultTab(tab) {
-            if (tab === 'phase1') {
-                tabPhase1Results.className = 'flex-1 py-3 px-4 text-center font-medium text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50';
-                tabPhase2Results.className = 'flex-1 py-3 px-4 text-center font-medium text-gray-500 hover:bg-gray-50';
-                phase1ResultsContent.classList.remove('hidden');
-                phase2ResultsContent.classList.add('hidden');
-            } else {
-                tabPhase1Results.className = 'flex-1 py-3 px-4 text-center font-medium text-gray-500 hover:bg-gray-50';
-                tabPhase2Results.className = 'flex-1 py-3 px-4 text-center font-medium text-purple-600 border-b-2 border-purple-600 bg-purple-50';
-                phase1ResultsContent.classList.add('hidden');
-                phase2ResultsContent.classList.remove('hidden');
             }
         }
 
