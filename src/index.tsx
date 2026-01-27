@@ -1311,52 +1311,6 @@ app.get('/', (c) => {
             </div>
         </section>
         
-        <!-- 최종 결과 요약 카드 (Step 6 완료 후 표시) -->
-        <section id="final-summary-section" class="hidden bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg mb-6 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center space-x-3 text-white">
-                    <i class="fas fa-flag-checkered text-3xl"></i>
-                    <div>
-                        <h3 class="text-xl font-bold">전체 프로세스 완료!</h3>
-                        <p class="text-green-100 text-sm">PR 접수부터 PO 발행까지 자동화 완료</p>
-                    </div>
-                </div>
-            </div>
-            <div class="grid grid-cols-4 gap-4 text-white">
-                <div class="bg-white/20 rounded-lg p-4 text-center">
-                    <div class="text-3xl font-bold" id="final-auto-rate">0%</div>
-                    <div class="text-sm text-green-100">자동처리율</div>
-                </div>
-                <div class="bg-white/20 rounded-lg p-4 text-center">
-                    <div class="text-3xl font-bold" id="final-confirmed">0</div>
-                    <div class="text-sm text-green-100">확정 건수</div>
-                </div>
-                <div class="bg-white/20 rounded-lg p-4 text-center">
-                    <div class="text-3xl font-bold" id="final-hitl">0</div>
-                    <div class="text-sm text-green-100">HITL 건수</div>
-                </div>
-                <div class="bg-white/20 rounded-lg p-4 text-center">
-                    <div class="text-3xl font-bold" id="final-total-amount">0</div>
-                    <div class="text-sm text-green-100">총 발주금액</div>
-                </div>
-            </div>
-            <!-- 결과 파일 다운로드 버튼 -->
-            <div class="mt-4 flex items-center justify-center space-x-3">
-                <button class="bg-white/30 hover:bg-white/40 text-white px-4 py-2 rounded-lg text-sm transition flex items-center space-x-2 disabled:opacity-50" disabled title="PoC - 기능 비활성화">
-                    <i class="fas fa-download"></i>
-                    <span>PR 분석 결과</span>
-                </button>
-                <button class="bg-white/30 hover:bg-white/40 text-white px-4 py-2 rounded-lg text-sm transition flex items-center space-x-2 disabled:opacity-50" disabled title="PoC - 기능 비활성화">
-                    <i class="fas fa-download"></i>
-                    <span>물량검토 검증 결과</span>
-                </button>
-                <button class="bg-white/30 hover:bg-white/40 text-white px-4 py-2 rounded-lg text-sm transition flex items-center space-x-2 disabled:opacity-50" disabled title="PoC - 기능 비활성화">
-                    <i class="fas fa-download"></i>
-                    <span>PO 생성 결과</span>
-                </button>
-            </div>
-        </section>
-
         <!-- 결과 요약 섹션 (완료 시 표시) -->
         <section id="summary-section" class="hidden">
             <!-- HITL 필요 건 목록 -->
@@ -1586,7 +1540,6 @@ app.get('/', (c) => {
             document.getElementById('company-status-section').classList.add('hidden');
             document.getElementById('phase2-inline-section').classList.add('hidden');
             document.getElementById('po-generation-section').classList.add('hidden');
-            document.getElementById('final-summary-section').classList.add('hidden');
             
             try {
                 // Step 1 시작
@@ -1808,9 +1761,6 @@ app.get('/', (c) => {
             
             updateStepUI(6, 'completed', state.steps.step6.message);
             updateProgressBar(100);
-            
-            // ★ Step 6 완료 후 최종 결과 요약 카드 표시
-            renderFinalSummary(state);
         }
         
         // ====================================================================
@@ -2048,31 +1998,7 @@ app.get('/', (c) => {
             section.classList.remove('hidden');
         }
         
-        function renderFinalSummary(state) {
-            const section = document.getElementById('final-summary-section');
-            const summary = state.summary;
-            
-            if (!summary) return;
-            
-            // 통계 업데이트
-            document.getElementById('final-auto-rate').textContent = summary.자동처리율 + '%';
-            document.getElementById('final-confirmed').textContent = summary.phase2.확정;
-            document.getElementById('final-hitl').textContent = summary.phase2.HITL;
-            
-            const totalAmount = summary.po?.총_발주금액 || 0;
-            // 금액을 읽기 쉬운 형태로 변환 (억/만 단위)
-            let amountText = '';
-            if (totalAmount >= 100000000) {
-                amountText = (totalAmount / 100000000).toFixed(1) + '억';
-            } else if (totalAmount >= 10000) {
-                amountText = (totalAmount / 10000).toFixed(0) + '만';
-            } else {
-                amountText = totalAmount.toLocaleString();
-            }
-            document.getElementById('final-total-amount').textContent = amountText + '원';
-            
-            section.classList.remove('hidden');
-        }
+        // renderFinalSummary 함수 제거됨 (카드 삭제)
 
         // ====================================================================
         // Reset
@@ -2096,7 +2022,6 @@ app.get('/', (c) => {
             document.getElementById('company-status-section').classList.add('hidden');
             document.getElementById('phase2-inline-section').classList.add('hidden');
             document.getElementById('po-generation-section').classList.add('hidden');
-            document.getElementById('final-summary-section').classList.add('hidden');
             document.getElementById('flow-summary').classList.add('hidden');
             document.getElementById('log-section').classList.add('hidden');
             
