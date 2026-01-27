@@ -910,6 +910,29 @@ app.get('/', (c) => {
                 <div id="progress-bar" class="progress-bar bg-gradient-to-r from-indigo-500 to-purple-500 h-3 rounded-full" style="width: 0%"></div>
             </div>
             
+            <!-- 상단 흐름 요약 (물량검토대상 → 협력사요청 → 수신완료) -->
+            <div id="flow-summary" class="hidden mb-6">
+                <div class="flex items-center justify-center space-x-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4">
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500">물량검토대상</div>
+                        <div class="text-2xl font-bold text-indigo-600" id="flow-review-target">-</div>
+                        <div class="text-xs text-gray-400">건</div>
+                    </div>
+                    <div class="text-2xl text-gray-300"><i class="fas fa-arrow-right"></i></div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500">협력사 요청</div>
+                        <div class="text-2xl font-bold text-purple-600" id="flow-request">-</div>
+                        <div class="text-xs text-gray-400">건</div>
+                    </div>
+                    <div class="text-2xl text-gray-300"><i class="fas fa-arrow-right"></i></div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500">수신완료</div>
+                        <div class="text-2xl font-bold text-green-600" id="flow-received">-</div>
+                        <div class="text-xs text-gray-400">건</div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Step 목록 -->
             <div class="grid grid-cols-5 gap-4">
                 <!-- Step 1 -->
@@ -982,6 +1005,103 @@ app.get('/', (c) => {
             </div>
             <div id="log-container" class="h-64 overflow-y-auto p-4 font-mono text-xs leading-relaxed scrollbar-thin" style="scrollbar-color: #4B5563 #1F2937;">
                 <div class="text-gray-500">로그가 여기에 표시됩니다...</div>
+            </div>
+        </section>
+        
+        <!-- =============================================== -->
+        <!-- 순차적 결과 표시 영역 (Step별 완료 후 나타남) -->
+        <!-- =============================================== -->
+        
+        <!-- Phase 1 결과 (Step 1 완료 후 표시) -->
+        <section id="phase1-inline-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
+            <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-2 text-white">
+                    <i class="fas fa-search"></i>
+                    <span class="font-semibold">Step 1 완료: PR 검토 결과</span>
+                </div>
+                <div class="flex items-center space-x-4 text-white text-sm">
+                    <span>물량검토: <strong id="p1i-review">0</strong>건</span>
+                    <span>견적대상: <strong id="p1i-quote">0</strong>건</span>
+                </div>
+            </div>
+            <div id="phase1-inline-content" class="p-4 max-h-72 overflow-auto scrollbar-thin">
+                <table class="result-table w-full text-xs">
+                    <thead>
+                        <tr>
+                            <th>자재번호</th>
+                            <th>PR NO</th>
+                            <th>계약단가</th>
+                            <th>유형코드</th>
+                            <th>적정성</th>
+                            <th>권장코드</th>
+                            <th>도장경유</th>
+                            <th>최종분류</th>
+                        </tr>
+                    </thead>
+                    <tbody id="phase1-inline-body">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        
+        <!-- 협력사 물량검토 현황판 (Step 2 완료 후 표시) -->
+        <section id="company-status-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-2 text-white">
+                    <i class="fas fa-industry"></i>
+                    <span class="font-semibold">Step 2 완료: 협력사 물량검토 현황</span>
+                </div>
+                <div class="text-white text-sm">
+                    요청 완료: <strong id="cs-total-request">0</strong>건
+                </div>
+            </div>
+            <div class="p-4">
+                <!-- 협력사 현황 테이블 -->
+                <table class="result-table w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th class="text-left">협력사코드</th>
+                            <th class="text-left">협력사명</th>
+                            <th class="text-center">요청건수</th>
+                            <th class="text-center">수신건수</th>
+                            <th class="text-center">상태</th>
+                            <th class="text-right">예상발주금액</th>
+                        </tr>
+                    </thead>
+                    <tbody id="company-status-body">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        
+        <!-- Phase 2 결과 (Step 4 완료 후 표시) -->
+        <section id="phase2-inline-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
+            <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-2 text-white">
+                    <i class="fas fa-check-double"></i>
+                    <span class="font-semibold">Step 4 완료: 물량검토 검증 결과</span>
+                </div>
+                <div class="flex items-center space-x-4 text-white text-sm">
+                    <span>확정: <strong id="p2i-confirmed">0</strong>건</span>
+                    <span>HITL: <strong id="p2i-hitl">0</strong>건</span>
+                    <span>취소: <strong id="p2i-canceled">0</strong>건</span>
+                </div>
+            </div>
+            <div id="phase2-inline-content" class="p-4 max-h-72 overflow-auto scrollbar-thin">
+                <table class="result-table w-full text-xs">
+                    <thead>
+                        <tr>
+                            <th>자재번호</th>
+                            <th>PR NO</th>
+                            <th>검토구분</th>
+                            <th>검증결과</th>
+                            <th>권장조치</th>
+                            <th>검증근거</th>
+                        </tr>
+                    </thead>
+                    <tbody id="phase2-inline-body">
+                    </tbody>
+                </table>
             </div>
         </section>
 
@@ -1344,6 +1464,10 @@ app.get('/', (c) => {
         }
 
         async function animateSteps(state) {
+            // 흐름 요약 표시
+            const flowSummary = document.getElementById('flow-summary');
+            flowSummary.classList.remove('hidden');
+            
             // Step 1 완료 로그
             addLog('철의장유형코드 검증/수정 중...', 'info', 1);
             await sleep(200);
@@ -1358,6 +1482,12 @@ app.get('/', (c) => {
                 state.steps.step1.data.유형코드_부적정 + '건 유형코드 부적정'
             );
             updateProgressBar(20);
+            
+            // 흐름 요약 - 물량검토대상 업데이트
+            document.getElementById('flow-review-target').textContent = state.steps.step1.data.물량검토대상;
+            
+            // ★ Step 1 완료 후 Phase 1 결과 테이블 표시
+            renderPhase1Inline(state);
             await sleep(300);
             
             // Step 2
@@ -1378,6 +1508,12 @@ app.get('/', (c) => {
                 '요청 완료: ' + state.steps.step2.data.총요청건수 + '건'
             );
             updateProgressBar(40);
+            
+            // 흐름 요약 - 협력사 요청 업데이트
+            document.getElementById('flow-request').textContent = state.steps.step2.data.총요청건수;
+            
+            // ★ Step 2 완료 후 협력사 현황판 표시
+            renderCompanyStatus(state);
             await sleep(300);
             
             // Step 3
@@ -1398,6 +1534,12 @@ app.get('/', (c) => {
                 '수신 완료: ' + state.steps.step3.data.총수신건수 + '건'
             );
             updateProgressBar(60);
+            
+            // 흐름 요약 - 수신완료 업데이트
+            document.getElementById('flow-received').textContent = state.steps.step3.data.총수신건수;
+            
+            // 협력사 현황판 상태 업데이트 (수신완료로)
+            updateCompanyStatusReceived(state);
             await sleep(300);
             
             // Step 4
@@ -1454,6 +1596,9 @@ app.get('/', (c) => {
                 state.steps.step4.data.HITL + '건 HITL'
             );
             updateProgressBar(80);
+            
+            // ★ Step 4 완료 후 Phase 2 결과 테이블 표시
+            renderPhase2Inline(state);
             await sleep(300);
             
             // Step 5
@@ -1469,6 +1614,155 @@ app.get('/', (c) => {
             
             updateStepUI(5, 'completed', state.steps.step5.message);
             updateProgressBar(100);
+        }
+        
+        // ====================================================================
+        // 순차적 결과 렌더링 함수
+        // ====================================================================
+        function renderPhase1Inline(state) {
+            const section = document.getElementById('phase1-inline-section');
+            const tbody = document.getElementById('phase1-inline-body');
+            const p1 = state.phase1Results;
+            
+            // 통계 업데이트
+            const reviewCount = p1.filter(function(r) { return r.최종분류 && r.최종분류.includes('물량검토'); }).length;
+            const quoteCount = p1.filter(function(r) { return r.최종분류 && r.최종분류.includes('견적'); }).length;
+            document.getElementById('p1i-review').textContent = reviewCount;
+            document.getElementById('p1i-quote').textContent = quoteCount;
+            
+            // 테이블 렌더링
+            tbody.innerHTML = p1.map(function(item) {
+                var 분류Badge = (item.최종분류 || '').includes('물량검토') ? 'badge-물량검토' : 'badge-견적대상';
+                var 적정성Color = item.유형코드_적정여부 === 'Y' ? 'text-green-600' : 'text-red-600';
+                
+                return '<tr>' +
+                    '<td class="font-mono">' + (item.자재번호 || '').substring(0, 18) + '...</td>' +
+                    '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
+                    '<td class="text-center font-bold ' + (item.계약단가존재 === 'Y' ? 'text-green-600' : 'text-red-600') + '">' + item.계약단가존재 + '</td>' +
+                    '<td class="text-center">' + item.유형코드 + '</td>' +
+                    '<td class="text-center ' + 적정성Color + '">' + item.유형코드_적정여부 + '</td>' +
+                    '<td class="text-center text-indigo-600">' + (item.권장코드 || '-') + '</td>' +
+                    '<td class="text-center">' + item.도장사경유 + '</td>' +
+                    '<td class="text-center"><span class="px-2 py-1 rounded text-xs ' + 분류Badge + '">' + item.최종분류 + '</span></td>' +
+                '</tr>';
+            }).join('');
+            
+            section.classList.remove('hidden');
+        }
+        
+        function renderCompanyStatus(state) {
+            const section = document.getElementById('company-status-section');
+            const tbody = document.getElementById('company-status-body');
+            const companies = state.steps.step2.data.협력사별 || {};
+            
+            // 총 요청건수
+            document.getElementById('cs-total-request').textContent = state.steps.step2.data.총요청건수;
+            
+            // 협력사 코드 매핑
+            const companyCodeMap = {
+                '세창앰앤이(주)': 'SC001',
+                '(주)케이이엠': 'KEM01',
+                '(주)동진테크': 'DJ001',
+                '한빛이엔지': 'HB001',
+                '한덕': 'HD001'
+            };
+            
+            // 예상 발주금액 (PoC용 더미 데이터)
+            const estimatedAmounts = {
+                '세창앰앤이(주)': 45000000,
+                '(주)케이이엠': 32000000,
+                '(주)동진테크': 28000000,
+                '한빛이엔지': 15000000,
+                '한덕': 12000000
+            };
+            
+            let html = '';
+            for (const company in companies) {
+                const code = companyCodeMap[company] || 'N/A';
+                const requestCount = companies[company];
+                const amount = estimatedAmounts[company] || 0;
+                
+                html += '<tr>' +
+                    '<td class="font-mono text-gray-600">' + code + '</td>' +
+                    '<td class="font-medium">' + company + '</td>' +
+                    '<td class="text-center font-bold text-purple-600">' + requestCount + '건</td>' +
+                    '<td class="text-center text-gray-400" id="cs-recv-' + code + '">-</td>' +
+                    '<td class="text-center"><span class="status-badge px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800" id="cs-status-' + code + '">' +
+                    '<i class="fas fa-clock mr-1"></i>요청중</span></td>' +
+                    '<td class="text-right font-medium text-gray-700">' + amount.toLocaleString() + '원</td>' +
+                '</tr>';
+            }
+            
+            tbody.innerHTML = html;
+            section.classList.remove('hidden');
+        }
+        
+        function updateCompanyStatusReceived(state) {
+            const companies = state.steps.step2.data.협력사별 || {};
+            
+            const companyCodeMap = {
+                '세창앰앤이(주)': 'SC001',
+                '(주)케이이엠': 'KEM01',
+                '(주)동진테크': 'DJ001',
+                '한빛이엔지': 'HB001',
+                '한덕': 'HD001'
+            };
+            
+            for (const company in companies) {
+                const code = companyCodeMap[company] || 'N/A';
+                const requestCount = companies[company];
+                
+                // 수신건수 업데이트
+                const recvEl = document.getElementById('cs-recv-' + code);
+                if (recvEl) {
+                    recvEl.textContent = requestCount + '건';
+                    recvEl.className = 'text-center font-bold text-green-600';
+                }
+                
+                // 상태 업데이트
+                const statusEl = document.getElementById('cs-status-' + code);
+                if (statusEl) {
+                    statusEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>수신완료';
+                    statusEl.className = 'px-2 py-1 rounded text-xs bg-green-100 text-green-800';
+                }
+            }
+        }
+        
+        function renderPhase2Inline(state) {
+            const section = document.getElementById('phase2-inline-section');
+            const tbody = document.getElementById('phase2-inline-body');
+            const p2 = state.phase2Results;
+            
+            // 통계 업데이트
+            const confirmedCount = p2.filter(function(r) { return r.권장조치 === '확정'; }).length;
+            const hitlCount = p2.filter(function(r) { return r.권장조치 === 'HITL'; }).length;
+            const canceledCount = p2.filter(function(r) { return r.권장조치 === '검토취소'; }).length;
+            
+            document.getElementById('p2i-confirmed').textContent = confirmedCount;
+            document.getElementById('p2i-hitl').textContent = hitlCount;
+            document.getElementById('p2i-canceled').textContent = canceledCount;
+            
+            // 테이블 렌더링
+            tbody.innerHTML = p2.map(function(item) {
+                var 조치Badge = 'badge-HITL';
+                if (item.권장조치 === '확정') 조치Badge = 'badge-확정';
+                else if (item.권장조치 === '검토취소') 조치Badge = 'badge-검토취소';
+                
+                var 결과Color = 'text-yellow-600';
+                if (item.검증결과 === '적합') 결과Color = 'text-green-600';
+                else if (item.검증결과 === '부적합') 결과Color = 'text-red-600';
+                
+                return '<tr>' +
+                    '<td class="font-mono">' + (item.자재번호 || '').substring(0, 18) + '...</td>' +
+                    '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
+                    '<td>' + item.검토구분 + '</td>' +
+                    '<td class="' + 결과Color + '">' + item.검증결과 + '</td>' +
+                    '<td class="text-center"><span class="px-2 py-1 rounded text-xs ' + 조치Badge + '">' + item.권장조치 + '</span></td>' +
+                    '<td class="text-xs text-gray-600">' + item.검증근거 + '</td>' +
+                '</tr>';
+            }).join('');
+            
+            section.classList.remove('hidden');
         }
 
         // ====================================================================
@@ -1487,6 +1781,18 @@ app.get('/', (c) => {
             }
             updateProgressBar(0);
             overallStatus.textContent = '대기 중';
+            
+            // 순차적 결과 섹션 숨기기
+            document.getElementById('phase1-inline-section').classList.add('hidden');
+            document.getElementById('company-status-section').classList.add('hidden');
+            document.getElementById('phase2-inline-section').classList.add('hidden');
+            document.getElementById('flow-summary').classList.add('hidden');
+            document.getElementById('log-section').classList.add('hidden');
+            
+            // 흐름 요약 초기화
+            document.getElementById('flow-review-target').textContent = '-';
+            document.getElementById('flow-request').textContent = '-';
+            document.getElementById('flow-received').textContent = '-';
             
             initialSection.classList.remove('hidden');
             summarySection.classList.add('hidden');
