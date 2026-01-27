@@ -1437,9 +1437,9 @@ app.get('/', (c) => {
                     await sleep(100);
                     const shortId = (item.자재번호 || '').substring(0, 15);
                     if (item.권장조치 === '확정') {
-                        addLog(shortId + ': ' + (item.현재유형코드 || '-') + '→' + (item.변경요청코드 || '-') + ' 도면 일치', 'success', 2);
+                        addLog(shortId + ': ' + (item.현재유형코드 || '-') + ' → ' + (item.변경요청코드 || '-') + ' 도면 일치', 'success', 2);
                     } else if (item.HITL유형 === 'Vision불일치') {
-                        addLog(shortId + ': 공급사 \'' + (item.변경요청코드 || '-') + '\' ≠ 도면 분석 → HITL', 'error', 2);
+                        addLog(shortId + ': 공급사 [' + (item.변경요청코드 || '-') + '] ≠ 도면 분석 → HITL', 'error', 2);
                     } else {
                         addLog(shortId + ': 도면 없음 → HITL', 'warning', 2);
                     }
