@@ -29,6 +29,34 @@ const COMPANY_CODE_MAP: Record<string, string> = {
   "한덕": "HD001"
 }
 
+// 유형코드별 시뮬레이션 단가 (PoC용 - 실제 서비스에서는 단가테이블에서 조회)
+// 단가단위: KG당 단가 (원)
+const TYPE_CODE_UNIT_PRICES: Record<string, number> = {
+  "B": 15000,  // 상선 기본(SS400)
+  "G": 22000,  // BENDING류/COVER류/BOX류
+  "I": 28000,  // PIPE, SQ.TUBE, BEAM TYPE
+  "N": 25000,  // CHECK PLATE 소요
+  "A": 35000,  // SUS304L
+  "S": 42000,  // SUS316L
+  "M": 45000,  // SUS316L - PIPE
+  "E": 40000   // COAMING (SUS316L)
+}
+
+// 시뮬레이션 중량 범위 (kg) - PoC용
+const SIMULATED_WEIGHT_RANGE = { min: 50, max: 500 }
+
+// 발주금액 계산 함수 (유형코드 기반)
+function calculateOrderAmount(typeCode: string, materialNo: string): number {
+  // 자재번호를 seed로 사용하여 일관된 중량 생성 (같은 자재는 항상 같은 금액)
+  let seed = 0
+  for (let i = 0; i < materialNo.length; i++) {
+    seed += materialNo.charCodeAt(i)
+  }
+  const weight = SIMULATED_WEIGHT_RANGE.min + (seed % (SIMULATED_WEIGHT_RANGE.max - SIMULATED_WEIGHT_RANGE.min))
+  const unitPrice = TYPE_CODE_UNIT_PRICES[typeCode] || TYPE_CODE_UNIT_PRICES["B"]
+  return Math.round(weight * unitPrice)
+}
+
 // PO 번호 채번 클래스 (룰: 40 + YYMMDD + NN)
 class PONumberGenerator {
   private sequence: number = 0
@@ -562,13 +590,21 @@ app.post('/api/integrated/run-all', async (c) => {
     // 1. 단가유형미변경 - 일괄 자동 확정
     for (const review of unchanged) {
       const prInfo = phase1Results.find((p: Phase1BatchResult) => p.자재번호 === review['자재번호'])
+      const typeCode = review['변경유형코드'] || review['철의장유형코드'] || prInfo?.유형코드 || 'B'
+      const orderAmount = calculateOrderAmount(typeCode, review['자재번호'])
+      
       phase2Results.push({
         자재번호: review['자재번호'],
         PR_NO: prInfo?.PR_NO || review['PR'] || '',
         검토구분: '단가유형미변경',
         검증결과: '적합',
         권장조치: '확정',
-        검증근거: '공급사 검토 결과: 단가유형 미변경. 자동 확정 처리'
+        검증근거: '공급사 검토 결과: 단가유형 미변경. 자동 확정 처리',
+        // 업체명 및 발주금액 추가
+        업체명: review['업체명'] || prInfo?.업체명 || '',
+        자재내역: review['자재내역'] || prInfo?.자재내역 || '',
+        현재유형코드: typeCode,
+        발주금액: orderAmount
       })
     }
     
@@ -581,7 +617,11 @@ app.post('/api/integrated/run-all', async (c) => {
         검토구분: '제작불가',
         검증결과: '해당없음',
         권장조치: '검토취소',
-        검증근거: '공급사 검토 결과: 제작불가. 자동 검토취소 처리'
+        검증근거: '공급사 검토 결과: 제작불가. 자동 검토취소 처리',
+        // 업체명 추가 (발주금액은 취소이므로 0)
+        업체명: review['업체명'] || prInfo?.업체명 || '',
+        자재내역: review['자재내역'] || prInfo?.자재내역 || '',
+        발주금액: 0
       })
     }
     
@@ -590,6 +630,9 @@ app.post('/api/integrated/run-all', async (c) => {
       const requestPrice = review['변경요청단가'] || 0
       // PR 정보 조회 (자재번호로 조인)
       const prInfo = phase1Results.find((p: Phase1BatchResult) => p.자재번호 === review['자재번호'])
+      const typeCode = review['변경유형코드'] || review['철의장유형코드'] || prInfo?.유형코드 || 'B'
+      // 협상필요 건도 예상 발주금액 계산 (HITL이지만 참고용)
+      const estimatedAmount = calculateOrderAmount(typeCode, review['자재번호'])
       
       phase2Results.push({
         자재번호: review['자재번호'],
@@ -604,6 +647,8 @@ app.post('/api/integrated/run-all', async (c) => {
         변경요청코드: review['변경유형코드'],
         업체명: prInfo?.업체명 || review['업체명'],
         도면번호: review['도면번호'],
+        // 발주금액 (예상)
+        발주금액: estimatedAmount,
         // Review 정보
         변경요청단가: requestPrice,
         변경유형코드명: review['변경유형코드명'],
@@ -624,7 +669,10 @@ app.post('/api/integrated/run-all', async (c) => {
       // PR 정보 조회 (자재번호로 조인)
       const prInfo = phase1Results.find((p: Phase1BatchResult) => p.자재번호 === review['자재번호'])
       
-      // 공통 PR/Review 정보
+      // 발주금액 계산 (변경요청코드 기준)
+      const orderAmount = calculateOrderAmount(changeType || currentType, review['자재번호'])
+      
+      // 공통 PR/Review 정보 (발주금액 포함)
       const commonInfo = {
         PR_NO: prInfo?.PR_NO || review['PR'] || '',
         자재내역: prInfo?.자재내역 || review['자재내역'],
@@ -632,7 +680,8 @@ app.post('/api/integrated/run-all', async (c) => {
         변경요청코드: changeType,
         업체명: prInfo?.업체명 || review['업체명'],
         도면번호: review['도면번호'],
-        변경유형코드명: review['변경유형코드명']
+        변경유형코드명: review['변경유형코드명'],
+        발주금액: orderAmount
       }
       
       if (drawingInfo) {
@@ -1824,14 +1873,32 @@ app.get('/', (c) => {
                 '한덕': { name: '대림에스엔피', code: 'V484' }
             };
             
-            // 예상 발주금액 (PoC용 더미 데이터)
-            const estimatedAmounts = {
-                '세창앰앤이(주)': 45000000,
-                '(주)케이이엠': 32000000,
-                '(주)동진테크': 28000000,
-                '한빛이엔지': 15000000,
-                '한덕': 12000000
+            // 예상 발주금액 계산 (Phase1 결과 기반)
+            // 유형코드별 단가 (백엔드와 동일 로직)
+            const typeCodeUnitPrices = {
+                'B': 15000, 'G': 22000, 'I': 28000, 'N': 25000,
+                'A': 35000, 'S': 42000, 'M': 45000, 'E': 40000
             };
+            function calcOrderAmount(typeCode, materialNo) {
+                let seed = 0;
+                for (let i = 0; i < materialNo.length; i++) {
+                    seed += materialNo.charCodeAt(i);
+                }
+                const weight = 50 + (seed % 450);
+                const unitPrice = typeCodeUnitPrices[typeCode] || typeCodeUnitPrices['B'];
+                return Math.round(weight * unitPrice);
+            }
+            
+            // 협력사별 예상 발주금액 계산 (물량검토대상 건들의 합계)
+            const estimatedAmounts = {};
+            const p1 = state.phase1Results || [];
+            const reviewTargets = p1.filter(r => r.최종분류 === '물량검토대상');
+            for (const item of reviewTargets) {
+                const company = item.업체명 || '미지정';
+                const typeCode = item.유형코드 || 'B';
+                const amount = calcOrderAmount(typeCode, item.자재번호);
+                estimatedAmounts[company] = (estimatedAmounts[company] || 0) + amount;
+            }
             
             let html = '';
             for (const company in companies) {
