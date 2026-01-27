@@ -11,13 +11,45 @@ type Bindings = {
   ANTHROPIC_API_KEY?: string
 }
 
-// 제작사-도장사 매핑 테이블
-const PAINTING_COMPANY_MAP: Record<string, string> = {
-  "세창앰앤이(주)": "대림에스엔피",
-  "(주)케이이엠": "진명에프앤피",
-  "(주)동진테크": "피에스산업",
-  "한빛이엔지": "성원기업",
-  "한덕": "대림에스엔피"
+// 제작사-도장사 매핑 테이블 (도장사코드 포함)
+const PAINTING_COMPANY_MAP: Record<string, { name: string; code: string }> = {
+  "세창앰앤이(주)": { name: "대림에스엔피", code: "V484" },
+  "(주)케이이엠": { name: "진명에프앤피", code: "V486" },
+  "(주)동진테크": { name: "피에스산업", code: "V485" },
+  "한빛이엔지": { name: "성원기업", code: "V487" },
+  "한덕": { name: "대림에스엔피", code: "V484" }
+}
+
+// 협력사 코드 매핑
+const COMPANY_CODE_MAP: Record<string, string> = {
+  "세창앰앤이(주)": "SC001",
+  "(주)케이이엠": "KEM01",
+  "(주)동진테크": "DJ001",
+  "한빛이엔지": "HB001",
+  "한덕": "HD001"
+}
+
+// PO 번호 채번 클래스 (룰: 40 + YYMMDD + NN)
+class PONumberGenerator {
+  private sequence: number = 0
+  private dateStr: string
+  
+  constructor() {
+    const now = new Date()
+    const yy = String(now.getFullYear()).slice(-2)
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const dd = String(now.getDate()).padStart(2, '0')
+    this.dateStr = `${yy}${mm}${dd}`
+  }
+  
+  generate(): string {
+    this.sequence++
+    return `40${this.dateStr}${String(this.sequence).padStart(2, '0')}`
+  }
+  
+  reset(): void {
+    this.sequence = 0
+  }
 }
 
 // ============================================================================
@@ -63,6 +95,11 @@ type Phase2BatchResult = {
   변경요청코드?: string
   업체명?: string
   도면번호?: string
+  발주금액?: number
+  발주수량?: number
+  도급수량?: number
+  중량단위?: string
+  기본단가?: number
   // Review 정보 (HITL 화면용)
   변경요청단가?: number
   변경유형코드명?: string
@@ -70,10 +107,23 @@ type Phase2BatchResult = {
   HITL유형?: '협상필요' | 'Vision불일치' | '도면없음'
 }
 
+// PO 결과 타입
+type POResult = {
+  PO_번호: string
+  PR_NO: string
+  자재번호: string
+  업체명: string
+  발주금액: number
+  발주일자: string
+  발주상태: string
+  검토구분: string
+  검증결과: string
+}
+
 // Step 상태 타입
 type StepStatus = 'pending' | 'processing' | 'completed' | 'error'
 
-// 통합 실행 상태
+// 통합 실행 상태 (6단계로 확장)
 type IntegratedRunState = {
   isRunning: boolean
   currentStep: number
@@ -82,10 +132,12 @@ type IntegratedRunState = {
     step2: { status: StepStatus; message: string; data?: any }
     step3: { status: StepStatus; message: string; data?: any }
     step4: { status: StepStatus; message: string; data?: any }
-    step5: { status: StepStatus; message: string; data?: any }
+    step5: { status: StepStatus; message: string; data?: any }  // PO 자동 생성
+    step6: { status: StepStatus; message: string; data?: any }  // 최종 결과 요약
   }
   phase1Results: Phase1BatchResult[]
   phase2Results: Phase2BatchResult[]
+  poResults: POResult[]  // PO 결과 추가
   summary?: {
     phase1: {
       총_분석건수: number
@@ -99,6 +151,10 @@ type IntegratedRunState = {
       확정: number
       HITL: number
       검토취소: number
+    }
+    po: {
+      총_PO건수: number
+      총_발주금액: number
     }
     자동처리율: string
   }
@@ -116,11 +172,16 @@ let integratedState: IntegratedRunState = {
     step2: { status: 'pending', message: '' },
     step3: { status: 'pending', message: '' },
     step4: { status: 'pending', message: '' },
-    step5: { status: 'pending', message: '' }
+    step5: { status: 'pending', message: '' },
+    step6: { status: 'pending', message: '' }
   },
   phase1Results: [],
-  phase2Results: []
+  phase2Results: [],
+  poResults: []
 }
+
+// PO 번호 생성기 인스턴스
+let poGenerator = new PONumberGenerator()
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -370,6 +431,7 @@ app.post('/api/integrated/run-all', async (c) => {
   }
 
   // 상태 초기화
+  poGenerator = new PONumberGenerator()  // PO 채번기 초기화
   integratedState = {
     isRunning: true,
     currentStep: 1,
@@ -379,10 +441,12 @@ app.post('/api/integrated/run-all', async (c) => {
       step2: { status: 'pending', message: '' },
       step3: { status: 'pending', message: '' },
       step4: { status: 'pending', message: '' },
-      step5: { status: 'pending', message: '' }
+      step5: { status: 'pending', message: '' },
+      step6: { status: 'pending', message: '' }
     },
     phase1Results: [],
-    phase2Results: []
+    phase2Results: [],
+    poResults: []
   }
 
   try {
@@ -407,7 +471,8 @@ app.post('/api/integrated/run-all', async (c) => {
       // 도장사 지정 (경유 Y인 경우)
       if (result.도장사경유 === 'Y') {
         const 제작사 = pr['업체명'] || ''
-        result.도장사 = PAINTING_COMPANY_MAP[제작사] || '미지정'
+        const paintingInfo = PAINTING_COMPANY_MAP[제작사]
+        result.도장사 = paintingInfo?.name || '미지정'
       }
       
       return {
@@ -643,9 +708,50 @@ app.post('/api/integrated/run-all', async (c) => {
     integratedState.currentStep = 5
 
     // ================================================================
-    // Step 5: 최종 결과 요약
+    // Step 5: PO 자동 생성 (확정 건에 대해)
     // ================================================================
-    integratedState.steps.step5 = { status: 'processing', message: '결과 집계 중...' }
+    integratedState.steps.step5 = { status: 'processing', message: 'PO 자동 생성 중...' }
+    
+    const confirmedItems = phase2Results.filter(r => r.권장조치 === '확정')
+    const poResults: POResult[] = []
+    let totalOrderAmount = 0
+    
+    const now = new Date()
+    const orderDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    
+    for (const item of confirmedItems) {
+      const poNumber = poGenerator.generate()
+      const orderAmount = item.발주금액 || 0
+      totalOrderAmount += orderAmount
+      
+      poResults.push({
+        PO_번호: poNumber,
+        PR_NO: item.PR_NO || '',
+        자재번호: item.자재번호,
+        업체명: item.업체명 || '',
+        발주금액: orderAmount,
+        발주일자: orderDate,
+        발주상태: '발주완료',
+        검토구분: item.검토구분,
+        검증결과: item.검증결과
+      })
+    }
+    
+    integratedState.poResults = poResults
+    integratedState.steps.step5 = { 
+      status: 'completed', 
+      message: `PO 생성 완료: ${poResults.length}건`,
+      data: {
+        총_PO건수: poResults.length,
+        총_발주금액: totalOrderAmount
+      }
+    }
+    integratedState.currentStep = 6
+
+    // ================================================================
+    // Step 6: 최종 결과 요약
+    // ================================================================
+    integratedState.steps.step6 = { status: 'processing', message: '결과 집계 중...' }
     
     const 확정 = phase2Results.filter(r => r.권장조치 === '확정').length
     const 검토취소 = phase2Results.filter(r => r.권장조치 === '검토취소').length
@@ -668,10 +774,14 @@ app.post('/api/integrated/run-all', async (c) => {
         HITL,
         검토취소
       },
+      po: {
+        총_PO건수: poResults.length,
+        총_발주금액: totalOrderAmount
+      },
       자동처리율
     }
     
-    integratedState.steps.step5 = { 
+    integratedState.steps.step6 = { 
       status: 'completed', 
       message: `자동처리율: ${자동처리}/${총검증}건 (${자동처리율}%)`,
       data: integratedState.summary
@@ -708,6 +818,7 @@ app.post('/api/integrated/run-all', async (c) => {
 // ============================================================================
 
 app.post('/api/reset', (c) => {
+  poGenerator = new PONumberGenerator()  // PO 채번기 초기화
   integratedState = {
     isRunning: false,
     currentStep: 0,
@@ -716,10 +827,12 @@ app.post('/api/reset', (c) => {
       step2: { status: 'pending', message: '' },
       step3: { status: 'pending', message: '' },
       step4: { status: 'pending', message: '' },
-      step5: { status: 'pending', message: '' }
+      step5: { status: 'pending', message: '' },
+      step6: { status: 'pending', message: '' }
     },
     phase1Results: [],
-    phase2Results: []
+    phase2Results: [],
+    poResults: []
   }
   return c.json({ success: true, message: '모든 결과가 초기화되었습니다.' })
 })
@@ -933,61 +1046,72 @@ app.get('/', (c) => {
                 </div>
             </div>
             
-            <!-- Step 목록 -->
-            <div class="grid grid-cols-5 gap-4">
+            <!-- Step 목록 (6단계) -->
+            <div class="grid grid-cols-6 gap-3">
                 <!-- Step 1 -->
-                <div id="step-1" class="step-box pending border-2 rounded-lg p-4">
+                <div id="step-1" class="step-box pending border-2 rounded-lg p-3">
                     <div class="flex items-center mb-2">
-                        <span id="step-1-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">1</span>
+                        <span id="step-1-icon" class="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2 text-sm">1</span>
                         <div>
                             <p class="text-xs text-gray-500">PR 검토 및 발주 방식 판단</p>
                         </div>
                     </div>
-                    <p id="step-1-message" class="text-xs text-gray-400 mt-2">대기</p>
+                    <p id="step-1-message" class="text-xs text-gray-400 mt-1">대기</p>
                 </div>
                 
                 <!-- Step 2 -->
-                <div id="step-2" class="step-box pending border-2 rounded-lg p-4">
+                <div id="step-2" class="step-box pending border-2 rounded-lg p-3">
                     <div class="flex items-center mb-2">
-                        <span id="step-2-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">2</span>
+                        <span id="step-2-icon" class="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2 text-sm">2</span>
                         <div>
                             <p class="text-xs text-gray-500">협력사 물량검토 요청</p>
                         </div>
                     </div>
-                    <p id="step-2-message" class="text-xs text-gray-400 mt-2">대기</p>
+                    <p id="step-2-message" class="text-xs text-gray-400 mt-1">대기</p>
                 </div>
                 
                 <!-- Step 3 -->
-                <div id="step-3" class="step-box pending border-2 rounded-lg p-4">
+                <div id="step-3" class="step-box pending border-2 rounded-lg p-3">
                     <div class="flex items-center mb-2">
-                        <span id="step-3-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">3</span>
+                        <span id="step-3-icon" class="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2 text-sm">3</span>
                         <div>
                             <p class="text-xs text-gray-500">협력사 물량검토 결과 수신</p>
                         </div>
                     </div>
-                    <p id="step-3-message" class="text-xs text-gray-400 mt-2">대기</p>
+                    <p id="step-3-message" class="text-xs text-gray-400 mt-1">대기</p>
                 </div>
                 
                 <!-- Step 4 -->
-                <div id="step-4" class="step-box pending border-2 rounded-lg p-4">
+                <div id="step-4" class="step-box pending border-2 rounded-lg p-3">
                     <div class="flex items-center mb-2">
-                        <span id="step-4-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">4</span>
+                        <span id="step-4-icon" class="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2 text-sm">4</span>
                         <div>
                             <p class="text-xs text-gray-500">협력사 물량검토 결과 검증</p>
                         </div>
                     </div>
-                    <p id="step-4-message" class="text-xs text-gray-400 mt-2">대기</p>
+                    <p id="step-4-message" class="text-xs text-gray-400 mt-1">대기</p>
                 </div>
                 
-                <!-- Step 5 -->
-                <div id="step-5" class="step-box pending border-2 rounded-lg p-4">
+                <!-- Step 5: PO 자동 생성 -->
+                <div id="step-5" class="step-box pending border-2 rounded-lg p-3">
                     <div class="flex items-center mb-2">
-                        <span id="step-5-icon" class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2">5</span>
+                        <span id="step-5-icon" class="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2 text-sm">5</span>
+                        <div>
+                            <p class="text-xs text-gray-500">PO 자동 생성</p>
+                        </div>
+                    </div>
+                    <p id="step-5-message" class="text-xs text-gray-400 mt-1">대기</p>
+                </div>
+                
+                <!-- Step 6: 최종 결과 요약 -->
+                <div id="step-6" class="step-box pending border-2 rounded-lg p-3">
+                    <div class="flex items-center mb-2">
+                        <span id="step-6-icon" class="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2 text-sm">6</span>
                         <div>
                             <p class="text-xs text-gray-500">최종 결과 요약</p>
                         </div>
                     </div>
-                    <p id="step-5-message" class="text-xs text-gray-400 mt-2">대기</p>
+                    <p id="step-6-message" class="text-xs text-gray-400 mt-1">대기</p>
                 </div>
             </div>
         </section>
@@ -1044,7 +1168,7 @@ app.get('/', (c) => {
             </div>
         </section>
         
-        <!-- 협력사 물량검토 현황판 (협력사 물량검토 요청 완료 후 표시) -->
+        <!-- 협력사 물량검토 현황판 (협력사 물량검토 요청 완료 후 표시) - 아코디언 UI -->
         <section id="company-status-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
             <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-3 flex items-center justify-between">
                 <div class="flex items-center space-x-2 text-white">
@@ -1056,15 +1180,18 @@ app.get('/', (c) => {
                 </div>
             </div>
             <div class="p-4">
-                <!-- 협력사 현황 테이블 -->
+                <!-- 협력사 현황 테이블 (아코디언 지원) -->
                 <table class="result-table w-full text-sm">
                     <thead>
                         <tr>
+                            <th class="text-center w-8"></th>
                             <th class="text-left">협력사코드</th>
                             <th class="text-left">협력사명</th>
                             <th class="text-center">요청건수</th>
                             <th class="text-center">수신건수</th>
                             <th class="text-center">상태</th>
+                            <th class="text-center">도장사코드</th>
+                            <th class="text-left">도장사지정업체</th>
                             <th class="text-right">예상발주금액</th>
                         </tr>
                     </thead>
@@ -1102,6 +1229,82 @@ app.get('/', (c) => {
                     <tbody id="phase2-inline-body">
                     </tbody>
                 </table>
+            </div>
+        </section>
+        
+        <!-- PO 자동 생성 결과 (PO 자동 생성 완료 후 표시) -->
+        <section id="po-generation-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-2 text-white">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <span class="font-semibold">PO 자동 생성 결과</span>
+                </div>
+                <div class="flex items-center space-x-4 text-white text-sm">
+                    <span>총 PO: <strong id="po-total-count">0</strong>건</span>
+                    <span>총 발주금액: <strong id="po-total-amount">0</strong>원</span>
+                </div>
+            </div>
+            <div id="po-generation-content" class="p-4 max-h-72 overflow-auto scrollbar-thin">
+                <table class="result-table w-full text-xs">
+                    <thead>
+                        <tr>
+                            <th>PO 번호</th>
+                            <th>PR NO</th>
+                            <th>자재번호</th>
+                            <th>협력사</th>
+                            <th class="text-right">발주금액</th>
+                            <th class="text-center">상태</th>
+                        </tr>
+                    </thead>
+                    <tbody id="po-table-body">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        
+        <!-- 최종 결과 요약 카드 (Step 6 완료 후 표시) -->
+        <section id="final-summary-section" class="hidden bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg mb-6 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-3 text-white">
+                    <i class="fas fa-flag-checkered text-3xl"></i>
+                    <div>
+                        <h3 class="text-xl font-bold">전체 프로세스 완료!</h3>
+                        <p class="text-green-100 text-sm">PR 접수부터 PO 발행까지 자동화 완료</p>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-4 gap-4 text-white">
+                <div class="bg-white/20 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold" id="final-auto-rate">0%</div>
+                    <div class="text-sm text-green-100">자동처리율</div>
+                </div>
+                <div class="bg-white/20 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold" id="final-confirmed">0</div>
+                    <div class="text-sm text-green-100">확정 건수</div>
+                </div>
+                <div class="bg-white/20 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold" id="final-hitl">0</div>
+                    <div class="text-sm text-green-100">HITL 건수</div>
+                </div>
+                <div class="bg-white/20 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold" id="final-total-amount">0</div>
+                    <div class="text-sm text-green-100">총 발주금액</div>
+                </div>
+            </div>
+            <!-- 결과 파일 다운로드 버튼 -->
+            <div class="mt-4 flex items-center justify-center space-x-3">
+                <button class="bg-white/30 hover:bg-white/40 text-white px-4 py-2 rounded-lg text-sm transition flex items-center space-x-2 disabled:opacity-50" disabled title="PoC - 기능 비활성화">
+                    <i class="fas fa-download"></i>
+                    <span>PR 분석 결과</span>
+                </button>
+                <button class="bg-white/30 hover:bg-white/40 text-white px-4 py-2 rounded-lg text-sm transition flex items-center space-x-2 disabled:opacity-50" disabled title="PoC - 기능 비활성화">
+                    <i class="fas fa-download"></i>
+                    <span>물량검토 검증 결과</span>
+                </button>
+                <button class="bg-white/30 hover:bg-white/40 text-white px-4 py-2 rounded-lg text-sm transition flex items-center space-x-2 disabled:opacity-50" disabled title="PoC - 기능 비활성화">
+                    <i class="fas fa-download"></i>
+                    <span>PO 생성 결과</span>
+                </button>
             </div>
         </section>
 
@@ -1322,12 +1525,19 @@ app.get('/', (c) => {
             logSection.classList.remove('hidden');
             clearLog();
             
-            // Step 초기화
-            for (let i = 1; i <= 5; i++) {
+            // Step 초기화 (6단계)
+            for (let i = 1; i <= 6; i++) {
                 updateStepUI(i, 'pending', '대기');
             }
             updateProgressBar(0);
             overallStatus.textContent = '실행 중...';
+            
+            // 순차적 결과 영역 숨기기
+            document.getElementById('phase1-inline-section').classList.add('hidden');
+            document.getElementById('company-status-section').classList.add('hidden');
+            document.getElementById('phase2-inline-section').classList.add('hidden');
+            document.getElementById('po-generation-section').classList.add('hidden');
+            document.getElementById('final-summary-section').classList.add('hidden');
             
             try {
                 // Step 1 시작
@@ -1497,25 +1707,61 @@ app.get('/', (c) => {
                 '검증 완료: ' + state.steps.step4.data.자동확정 + '건 확정, ' + 
                 state.steps.step4.data.HITL + '건 HITL'
             );
-            updateProgressBar(80);
+            updateProgressBar(67);
             
             // ★ Step 4 완료 후 Phase 2 결과 테이블 표시
             renderPhase2Inline(state);
             await sleep(300);
             
-            // Step 5
+            // Step 5: PO 자동 생성
             addLog('', 'divider');
-            updateStepUI(5, 'processing', '결과 집계 중...');
+            addLog('PO 자동 생성', 'header');
+            updateStepUI(5, 'processing', 'PO 자동 생성 중...');
+            await sleep(200);
+            
+            const poResults = state.poResults || [];
+            const totalPOAmount = state.summary?.po?.총_발주금액 || 0;
+            
+            addLog('PO 생성 대상: ' + poResults.length + '건 (확정 건)', 'info', 1);
+            
+            // PO 생성 상세 로그
+            for (const po of poResults.slice(0, 5)) {  // 처음 5개만 로그
+                await sleep(80);
+                addLog('PR ' + (po.PR_NO || '-') + ' → ' + po.PO_번호 + ' 생성', 'success', 1);
+            }
+            if (poResults.length > 5) {
+                addLog('... 외 ' + (poResults.length - 5) + '건 PO 생성', 'info', 1);
+            }
+            
+            addLog('💰 총 발주금액: ' + totalPOAmount.toLocaleString() + '원', 'success', 1);
+            
+            updateStepUI(5, 'completed', state.steps.step5.message);
+            updateProgressBar(84);
+            
+            // ★ Step 5 완료 후 PO 생성 결과 테이블 표시
+            renderPOTable(state);
             await sleep(300);
+            
+            // Step 6: 최종 결과 요약
+            addLog('', 'divider');
+            addLog('최종 결과 요약', 'header');
+            updateStepUI(6, 'processing', '결과 집계 중...');
+            await sleep(200);
             
             const autoRate = state.summary?.자동처리율 || '0.0';
             const autoCount = (state.summary?.phase2?.확정 || 0) + (state.summary?.phase2?.검토취소 || 0);
             const totalCount = state.summary?.phase2?.총_검증건수 || 0;
+            const hitlCount = state.summary?.phase2?.HITL || 0;
             
             addLog('📊 자동처리율: ' + autoCount + '/' + totalCount + '건 (' + autoRate + '%)', 'success');
+            addLog('📦 PO 자동생성: ' + poResults.length + '건 / ' + totalPOAmount.toLocaleString() + '원', 'success');
+            addLog('⚠️ HITL 필요: ' + hitlCount + '건', hitlCount > 0 ? 'warning' : 'info');
             
-            updateStepUI(5, 'completed', state.steps.step5.message);
+            updateStepUI(6, 'completed', state.steps.step6.message);
             updateProgressBar(100);
+            
+            // ★ Step 6 완료 후 최종 결과 요약 카드 표시
+            renderFinalSummary(state);
         }
         
         // ====================================================================
@@ -1569,6 +1815,15 @@ app.get('/', (c) => {
                 '한덕': 'HD001'
             };
             
+            // 도장사 매핑 (협력사 → 도장사)
+            const paintingCompanyMap = {
+                '세창앰앤이(주)': { name: '대림에스엔피', code: 'V484' },
+                '(주)케이이엠': { name: '진명에프앤피', code: 'V486' },
+                '(주)동진테크': { name: '피에스산업', code: 'V485' },
+                '한빛이엔지': { name: '성원기업', code: 'V487' },
+                '한덕': { name: '대림에스엔피', code: 'V484' }
+            };
+            
             // 예상 발주금액 (PoC용 더미 데이터)
             const estimatedAmounts = {
                 '세창앰앤이(주)': 45000000,
@@ -1583,20 +1838,53 @@ app.get('/', (c) => {
                 const code = companyCodeMap[company] || 'N/A';
                 const requestCount = companies[company];
                 const amount = estimatedAmounts[company] || 0;
+                const paintingInfo = paintingCompanyMap[company] || { name: '-', code: '-' };
                 
-                html += '<tr>' +
+                html += '<tr class="company-row cursor-pointer hover:bg-gray-50" data-company="' + company + '">' +
+                    '<td class="text-center w-8"><i class="fas fa-chevron-right text-gray-400 toggle-icon"></i></td>' +
                     '<td class="font-mono text-gray-600">' + code + '</td>' +
                     '<td class="font-medium">' + company + '</td>' +
                     '<td class="text-center font-bold text-purple-600">' + requestCount + '건</td>' +
                     '<td class="text-center text-gray-400" id="cs-recv-' + code + '">-</td>' +
                     '<td class="text-center"><span class="status-badge px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800" id="cs-status-' + code + '">' +
                     '<i class="fas fa-clock mr-1"></i>요청중</span></td>' +
+                    '<td class="text-center font-mono text-sm text-gray-500">' + paintingInfo.code + '</td>' +
+                    '<td class="text-gray-700">' + paintingInfo.name + '</td>' +
                     '<td class="text-right font-medium text-gray-700">' + amount.toLocaleString() + '원</td>' +
+                '</tr>' +
+                '<tr class="detail-row hidden" data-company-detail="' + company + '">' +
+                    '<td colspan="9" class="bg-gray-50 p-0">' +
+                    '<div class="p-4 text-xs">' +
+                    '<div class="text-gray-500 mb-2 font-semibold">PR 상세 목록 (클릭 시 표시 - PoC 미구현)</div>' +
+                    '</div>' +
+                    '</td>' +
                 '</tr>';
             }
             
             tbody.innerHTML = html;
             section.classList.remove('hidden');
+            
+            // 아코디언 이벤트 설정
+            setupCompanyAccordion();
+        }
+        
+        function setupCompanyAccordion() {
+            const companyRows = document.querySelectorAll('.company-row');
+            companyRows.forEach(row => {
+                row.addEventListener('click', function() {
+                    const company = this.getAttribute('data-company');
+                    const detailRow = document.querySelector('[data-company-detail="' + company + '"]');
+                    const icon = this.querySelector('.toggle-icon');
+                    
+                    if (detailRow) {
+                        detailRow.classList.toggle('hidden');
+                        if (icon) {
+                            icon.classList.toggle('fa-chevron-right');
+                            icon.classList.toggle('fa-chevron-down');
+                        }
+                    }
+                });
+            });
         }
         
         function updateCompanyStatusReceived(state) {
@@ -1666,6 +1954,58 @@ app.get('/', (c) => {
             
             section.classList.remove('hidden');
         }
+        
+        function renderPOTable(state) {
+            const section = document.getElementById('po-generation-section');
+            const tbody = document.getElementById('po-table-body');
+            const poResults = state.poResults || [];
+            
+            // 통계 업데이트
+            const totalAmount = state.summary?.po?.총_발주금액 || 0;
+            document.getElementById('po-total-count').textContent = poResults.length;
+            document.getElementById('po-total-amount').textContent = totalAmount.toLocaleString();
+            
+            // 테이블 렌더링
+            tbody.innerHTML = poResults.map(function(item) {
+                return '<tr>' +
+                    '<td class="font-mono font-bold text-blue-600">' + (item.PO_번호 || '-') + '</td>' +
+                    '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
+                    '<td class="font-mono text-xs">' + (item.자재번호 || '').substring(0, 20) + '...</td>' +
+                    '<td>' + (item.업체명 || '-') + '</td>' +
+                    '<td class="text-right font-medium">' + (item.발주금액 || 0).toLocaleString() + '원</td>' +
+                    '<td class="text-center"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-800">' +
+                    '<i class="fas fa-check-circle mr-1"></i>' + (item.발주상태 || '-') + '</span></td>' +
+                '</tr>';
+            }).join('');
+            
+            section.classList.remove('hidden');
+        }
+        
+        function renderFinalSummary(state) {
+            const section = document.getElementById('final-summary-section');
+            const summary = state.summary;
+            
+            if (!summary) return;
+            
+            // 통계 업데이트
+            document.getElementById('final-auto-rate').textContent = summary.자동처리율 + '%';
+            document.getElementById('final-confirmed').textContent = summary.phase2.확정;
+            document.getElementById('final-hitl').textContent = summary.phase2.HITL;
+            
+            const totalAmount = summary.po?.총_발주금액 || 0;
+            // 금액을 읽기 쉬운 형태로 변환 (억/만 단위)
+            let amountText = '';
+            if (totalAmount >= 100000000) {
+                amountText = (totalAmount / 100000000).toFixed(1) + '억';
+            } else if (totalAmount >= 10000) {
+                amountText = (totalAmount / 10000).toFixed(0) + '만';
+            } else {
+                amountText = totalAmount.toLocaleString();
+            }
+            document.getElementById('final-total-amount').textContent = amountText + '원';
+            
+            section.classList.remove('hidden');
+        }
 
         // ====================================================================
         // Reset
@@ -1677,8 +2017,8 @@ app.get('/', (c) => {
             
             currentState = null;
             
-            // UI 초기화
-            for (let i = 1; i <= 5; i++) {
+            // UI 초기화 (6단계)
+            for (let i = 1; i <= 6; i++) {
                 updateStepUI(i, 'pending', '대기');
             }
             updateProgressBar(0);
@@ -1688,6 +2028,8 @@ app.get('/', (c) => {
             document.getElementById('phase1-inline-section').classList.add('hidden');
             document.getElementById('company-status-section').classList.add('hidden');
             document.getElementById('phase2-inline-section').classList.add('hidden');
+            document.getElementById('po-generation-section').classList.add('hidden');
+            document.getElementById('final-summary-section').classList.add('hidden');
             document.getElementById('flow-summary').classList.add('hidden');
             document.getElementById('log-section').classList.add('hidden');
             
@@ -1709,32 +2051,32 @@ app.get('/', (c) => {
             const stepIcon = document.getElementById('step-' + step + '-icon');
             const stepMessage = document.getElementById('step-' + step + '-message');
             
-            stepBox.className = 'step-box ' + status + ' border-2 rounded-lg p-4';
+            stepBox.className = 'step-box ' + status + ' border-2 rounded-lg p-3';
             
             if (status === 'pending') {
-                stepIcon.className = 'w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2';
+                stepIcon.className = 'w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold mr-2 text-sm';
                 stepIcon.innerHTML = step;
             } else if (status === 'processing') {
-                stepIcon.className = 'w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center text-white font-bold mr-2';
-                stepIcon.innerHTML = '<i class="fas fa-spinner fa-spin text-sm"></i>';
+                stepIcon.className = 'w-7 h-7 rounded-full bg-yellow-500 flex items-center justify-center text-white font-bold mr-2 text-sm';
+                stepIcon.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i>';
             } else if (status === 'completed') {
-                stepIcon.className = 'w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white font-bold mr-2';
-                stepIcon.innerHTML = '<i class="fas fa-check text-sm"></i>';
+                stepIcon.className = 'w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white font-bold mr-2 text-sm';
+                stepIcon.innerHTML = '<i class="fas fa-check text-xs"></i>';
             } else if (status === 'error') {
-                stepIcon.className = 'w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white font-bold mr-2';
-                stepIcon.innerHTML = '<i class="fas fa-times text-sm"></i>';
+                stepIcon.className = 'w-7 h-7 rounded-full bg-red-500 flex items-center justify-center text-white font-bold mr-2 text-sm';
+                stepIcon.innerHTML = '<i class="fas fa-times text-xs"></i>';
             }
             
             stepMessage.textContent = message;
             
             if (status === 'processing') {
-                stepMessage.className = 'text-xs text-yellow-700 mt-2 font-medium';
+                stepMessage.className = 'text-xs text-yellow-700 mt-1 font-medium';
             } else if (status === 'completed') {
-                stepMessage.className = 'text-xs text-green-700 mt-2';
+                stepMessage.className = 'text-xs text-green-700 mt-1';
             } else if (status === 'error') {
-                stepMessage.className = 'text-xs text-red-700 mt-2';
+                stepMessage.className = 'text-xs text-red-700 mt-1';
             } else {
-                stepMessage.className = 'text-xs text-gray-400 mt-2';
+                stepMessage.className = 'text-xs text-gray-400 mt-1';
             }
         }
 
@@ -1745,8 +2087,8 @@ app.get('/', (c) => {
         function updateUI(state) {
             if (!state) return;
             
-            // Step 상태 업데이트
-            for (let i = 1; i <= 5; i++) {
+            // Step 상태 업데이트 (6단계)
+            for (let i = 1; i <= 6; i++) {
                 const stepKey = 'step' + i;
                 const step = state.steps[stepKey];
                 if (step) {
