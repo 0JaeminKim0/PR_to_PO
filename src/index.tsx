@@ -579,7 +579,11 @@ app.post('/api/integrated/run-all', async (c) => {
     // ================================================================
     integratedState.steps.step3 = { status: 'processing', message: '결과 수신 중...' }
     
-    const reviewList = reviewData as any[]
+    // ★★★ 중요: 물량검토대상 자재번호만 필터링하여 처리 ★★★
+    // 견적대상(7건)은 물량검토 프로세스를 거치지 않음
+    const reviewTargetMaterialNos = new Set(reviewTargets.map(r => r.자재번호))
+    const reviewList = (reviewData as any[]).filter(r => reviewTargetMaterialNos.has(r['자재번호']))
+    
     const reviewCounts: Record<string, number> = {}
     
     for (const r of reviewList) {
