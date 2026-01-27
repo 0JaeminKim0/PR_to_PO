@@ -5658,3 +5658,6 @@ export const priceTableGrouped = {
 
 // 철의장상세구분 코드 목록
 export const priceCodeList = ["B", "A", "G", "I", "S", "M", "N", "E"];
+
+// 자재속성그룹 코드 목록 (계약단가 존재 여부 판단용)
+export const assetGroupCodeList = ["PQPA", "PQPC", "PQPD", "PQPG", "PQPM", "PQPS", "PQPU"];

@@ -4,7 +4,7 @@ import { cors } from 'hono/cors'
 // 데이터 임포트
 import { prData } from './pr-data.js'
 import { reviewData } from './review-data.js'
-import { priceTableRaw, priceCodeList } from './price-table.js'
+import { priceTableRaw, priceCodeList, assetGroupCodeList } from './price-table.js'
 import { drawingMapping } from './drawing-mapping.js'
 
 type Bindings = {
@@ -142,8 +142,9 @@ function buildBatchPhase1SystemPrompt(): string {
 4. 최종 발주 방식 결정
 
 ## Process 1: 계약단가 존재 확인
-- 자재속성이 단가테이블 코드 목록에 존재하면 "Y", 아니면 "N"
-- 단가테이블 코드: ${priceCodeList.join(', ')}
+- 자재속성(자재속성그룹)이 단가테이블의 자재속성그룹 코드 목록에 존재하면 "Y", 아니면 "N"
+- 단가테이블 자재속성그룹 코드: ${assetGroupCodeList.join(', ')}
+- 예: PQPD → 존재(Y), FSGP → 미존재(N)
 
 ## Process 2: 철의장유형코드 검증
 - B: 기본 상선 (Angle + Plate 단순 조합, PIPE SUPPORT)
