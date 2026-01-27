@@ -1107,89 +1107,6 @@ app.get('/', (c) => {
 
         <!-- 결과 요약 섹션 (완료 시 표시) -->
         <section id="summary-section" class="hidden">
-            <!-- 통계 카드 -->
-            <div class="grid grid-cols-2 gap-6 mb-6">
-                <!-- PR 검토 결과 통계 -->
-                <div class="bg-white rounded-xl shadow-md p-6">
-                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-search mr-2 text-indigo-600"></i>
-                        PR 검토 및 발주 방식 판단 결과
-                    </h3>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="stat-card bg-gray-50 rounded-lg p-4 text-center">
-                            <div class="text-2xl font-bold text-gray-700" id="p1-total">0</div>
-                            <div class="text-xs text-gray-500">총 분석</div>
-                        </div>
-                        <div class="stat-card bg-green-50 rounded-lg p-4 text-center">
-                            <div class="text-2xl font-bold text-green-600" id="p1-review">0</div>
-                            <div class="text-xs text-gray-500">물량검토대상</div>
-                        </div>
-                        <div class="stat-card bg-blue-50 rounded-lg p-4 text-center">
-                            <div class="text-2xl font-bold text-blue-600" id="p1-quote">0</div>
-                            <div class="text-xs text-gray-500">견적대상</div>
-                        </div>
-                    </div>
-                    <div class="mt-4 text-sm text-gray-600">
-                        <span class="inline-flex items-center mr-4">
-                            <i class="fas fa-exclamation-triangle text-red-500 mr-1"></i>
-                            유형코드 부적정: <span id="p1-type-invalid" class="font-bold ml-1">0</span>건
-                        </span>
-                        <span class="inline-flex items-center">
-                            <i class="fas fa-paint-brush text-purple-500 mr-1"></i>
-                            도장사 경유: <span id="p1-painting" class="font-bold ml-1">0</span>건
-                        </span>
-                    </div>
-                </div>
-                
-                <!-- 물량검토 검증 결과 통계 -->
-                <div class="bg-white rounded-xl shadow-md p-6">
-                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-check-double mr-2 text-purple-600"></i>
-                        협력사 물량검토 결과 검증
-                    </h3>
-                    <div class="grid grid-cols-4 gap-3">
-                        <div class="stat-card bg-gray-50 rounded-lg p-3 text-center">
-                            <div class="text-xl font-bold text-gray-700" id="p2-total">0</div>
-                            <div class="text-xs text-gray-500">총 검증</div>
-                        </div>
-                        <div class="stat-card bg-green-50 rounded-lg p-3 text-center">
-                            <div class="text-xl font-bold text-green-600" id="p2-confirmed">0</div>
-                            <div class="text-xs text-gray-500">확정</div>
-                        </div>
-                        <div class="stat-card bg-yellow-50 rounded-lg p-3 text-center">
-                            <div class="text-xl font-bold text-yellow-600" id="p2-hitl">0</div>
-                            <div class="text-xs text-gray-500">HITL</div>
-                        </div>
-                        <div class="stat-card bg-gray-100 rounded-lg p-3 text-center">
-                            <div class="text-xl font-bold text-gray-600" id="p2-canceled">0</div>
-                            <div class="text-xs text-gray-500">취소</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 검토구분별 결과 테이블 -->
-            <div class="bg-white rounded-xl shadow-md p-6 mb-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-table mr-2 text-indigo-600"></i>
-                    검토구분별 결과
-                </h3>
-                <table class="result-table w-full text-sm">
-                    <thead>
-                        <tr>
-                            <th class="text-left">검토구분</th>
-                            <th class="text-center">건수</th>
-                            <th class="text-center">확정</th>
-                            <th class="text-center">HITL</th>
-                            <th class="text-center">취소</th>
-                            <th class="text-left">처리 방식</th>
-                        </tr>
-                    </thead>
-                    <tbody id="review-type-table">
-                    </tbody>
-                </table>
-            </div>
-            
             <!-- HITL 필요 건 목록 -->
             <div id="hitl-section" class="bg-white rounded-xl shadow-md p-6 mb-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
@@ -1848,24 +1765,6 @@ app.get('/', (c) => {
         function showSummary() {
             if (!currentState || !currentState.summary) return;
             
-            const summary = currentState.summary;
-            
-            // PR 검토 결과 통계
-            document.getElementById('p1-total').textContent = summary.phase1.총_분석건수;
-            document.getElementById('p1-review').textContent = summary.phase1.물량검토대상;
-            document.getElementById('p1-quote').textContent = summary.phase1.견적대상;
-            document.getElementById('p1-type-invalid').textContent = summary.phase1.유형코드_부적정;
-            document.getElementById('p1-painting').textContent = summary.phase1.도장사_경유;
-            
-            // Phase 2 통계
-            document.getElementById('p2-total').textContent = summary.phase2.총_검증건수;
-            document.getElementById('p2-confirmed').textContent = summary.phase2.확정;
-            document.getElementById('p2-hitl').textContent = summary.phase2.HITL;
-            document.getElementById('p2-canceled').textContent = summary.phase2.검토취소;
-            
-            // 검토구분별 테이블
-            renderReviewTypeTable();
-            
             // HITL 목록
             renderHitlList();
             
@@ -1874,37 +1773,6 @@ app.get('/', (c) => {
             renderPhase2Table();
             
             summarySection.classList.remove('hidden');
-        }
-
-        function renderReviewTypeTable() {
-            const tbody = document.getElementById('review-type-table');
-            const p2 = currentState.phase2Results;
-            
-            // 검토구분별 집계
-            const types = ['단가유형미변경', '단가유형변경', '협상필요', '제작불가'];
-            const methods = {
-                '단가유형미변경': '자동확정 (일괄)',
-                '단가유형변경': 'Vision 검증',
-                '협상필요': 'HITL (일괄)',
-                '제작불가': '자동취소 (일괄)'
-            };
-            
-            tbody.innerHTML = types.map(type => {
-                const items = p2.filter(r => r.검토구분 === type);
-                const count = items.length;
-                const confirmed = items.filter(r => r.권장조치 === '확정').length;
-                const hitl = items.filter(r => r.권장조치 === 'HITL').length;
-                const canceled = items.filter(r => r.권장조치 === '검토취소').length;
-                
-                return '<tr>' +
-                    '<td class="font-medium">' + type + '</td>' +
-                    '<td class="text-center">' + count + '건</td>' +
-                    '<td class="text-center text-green-600">' + confirmed + '건</td>' +
-                    '<td class="text-center text-yellow-600">' + hitl + '건</td>' +
-                    '<td class="text-center text-gray-600">' + canceled + '건</td>' +
-                    '<td class="text-gray-500">' + methods[type] + '</td>' +
-                '</tr>';
-            }).join('');
         }
 
         // HITL 전역 상태
