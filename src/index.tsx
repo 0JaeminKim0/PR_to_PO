@@ -106,6 +106,14 @@ type Phase1BatchResult = {
   재질?: string
   업체명?: string
   철의장유형코드_원본?: string
+  // 추가 필드 (아코디언 펼침용)
+  발주수량?: number
+  도급수량?: number
+  중량단위?: string
+  기본단가?: number
+  발주금액?: number
+  도장사코드?: string
+  도면번호?: string
 }
 
 // Phase 2 결과 타입 (배치) - HITL 화면 개선을 위해 확장
@@ -496,12 +504,19 @@ app.post('/api/integrated/run-all', async (c) => {
     phase1Results = phase1Results.map((result: Phase1BatchResult, i: number) => {
       const pr = prList[i] || {}
       
+      // 도장사 정보 가져오기
+      const 제작사 = pr['업체명'] || ''
+      const paintingInfo = PAINTING_COMPANY_MAP[제작사]
+      
       // 도장사 지정 (경유 Y인 경우)
       if (result.도장사경유 === 'Y') {
-        const 제작사 = pr['업체명'] || ''
-        const paintingInfo = PAINTING_COMPANY_MAP[제작사]
         result.도장사 = paintingInfo?.name || '미지정'
       }
+      
+      // 유형코드 기반 발주금액 계산
+      const typeCode = result.유형코드 || pr['철의장유형코드'] || 'B'
+      const materialNo = result.자재번호 || ''
+      const calculatedAmount = calculateOrderAmount(typeCode, materialNo)
       
       return {
         ...result,
@@ -510,7 +525,15 @@ app.post('/api/integrated/run-all', async (c) => {
         자재속성: pr['자재속성'],
         재질: pr['재질'],
         업체명: pr['업체명'],
-        철의장유형코드_원본: pr['철의장유형코드']
+        철의장유형코드_원본: pr['철의장유형코드'],
+        // 추가 필드 (아코디언 펼침용)
+        발주수량: pr['발주수량'] || 1,
+        도급수량: pr['도급수량'] || 100,
+        중량단위: pr['중량단위'] || 'KG',
+        기본단가: pr['기본단가'] || TYPE_CODE_UNIT_PRICES[typeCode] || 15000,
+        발주금액: calculatedAmount,
+        도장사코드: paintingInfo?.code || '',
+        도면번호: pr['도면번호'] || ''
       }
     })
     
@@ -1857,6 +1880,9 @@ app.get('/', (c) => {
                 const amount = estimatedAmounts[company] || 0;
                 const paintingInfo = paintingCompanyMap[company] || { name: '-', code: '-' };
                 
+                // 해당 협력사의 PR 상세 목록 가져오기
+                const companyPRs = reviewTargets.filter(r => r.업체명 === company);
+                
                 html += '<tr class="company-row cursor-pointer hover:bg-gray-50" data-company="' + company + '">' +
                     '<td class="text-center w-8"><i class="fas fa-chevron-right text-gray-400 toggle-icon"></i></td>' +
                     '<td class="font-mono text-gray-600">' + code + '</td>' +
@@ -1871,11 +1897,49 @@ app.get('/', (c) => {
                 '</tr>' +
                 '<tr class="detail-row hidden" data-company-detail="' + company + '">' +
                     '<td colspan="9" class="bg-gray-50 p-0">' +
-                    '<div class="p-4 text-xs">' +
-                    '<div class="text-gray-500 mb-2 font-semibold">PR 상세 목록 (클릭 시 표시 - PoC 미구현)</div>' +
-                    '</div>' +
-                    '</td>' +
-                '</tr>';
+                    '<div class="p-4">' +
+                    '<div class="text-gray-600 mb-3 font-semibold text-sm flex items-center">' +
+                    '<i class="fas fa-list-ul mr-2"></i>PR 상세 목록 (' + companyPRs.length + '건)</div>' +
+                    '<div class="overflow-x-auto">' +
+                    '<table class="min-w-full text-xs border border-gray-200 rounded">' +
+                    '<thead class="bg-gray-100">' +
+                    '<tr>' +
+                    '<th class="px-2 py-2 text-left font-semibold text-gray-700">PR번호</th>' +
+                    '<th class="px-2 py-2 text-left font-semibold text-gray-700">자재번호</th>' +
+                    '<th class="px-2 py-2 text-left font-semibold text-gray-700">자재내역</th>' +
+                    '<th class="px-2 py-2 text-center font-semibold text-gray-700">유형코드</th>' +
+                    '<th class="px-2 py-2 text-right font-semibold text-gray-700">발주수량</th>' +
+                    '<th class="px-2 py-2 text-right font-semibold text-gray-700">도급수량</th>' +
+                    '<th class="px-2 py-2 text-center font-semibold text-gray-700">중량단위</th>' +
+                    '<th class="px-2 py-2 text-right font-semibold text-gray-700">기본단가</th>' +
+                    '<th class="px-2 py-2 text-right font-semibold text-gray-700">발주금액</th>' +
+                    '<th class="px-2 py-2 text-center font-semibold text-gray-700">도장사코드</th>' +
+                    '<th class="px-2 py-2 text-left font-semibold text-gray-700">도장사</th>' +
+                    '</tr>' +
+                    '</thead>' +
+                    '<tbody class="bg-white divide-y divide-gray-100">';
+                
+                // PR 상세 목록 행 추가
+                for (const pr of companyPRs) {
+                    const prAmount = pr.발주금액 || calcOrderAmount(pr.유형코드 || 'B', pr.자재번호);
+                    const prPaintingInfo = paintingCompanyMap[pr.업체명] || { name: '-', code: '-' };
+                    
+                    html += '<tr class="hover:bg-blue-50">' +
+                        '<td class="px-2 py-1.5 font-mono text-blue-600">' + (pr.PR_NO || '-') + '</td>' +
+                        '<td class="px-2 py-1.5 font-mono text-gray-600">' + (pr.자재번호 || '-') + '</td>' +
+                        '<td class="px-2 py-1.5 text-gray-700 truncate max-w-[200px]" title="' + (pr.자재내역 || '') + '">' + (pr.자재내역 || '-') + '</td>' +
+                        '<td class="px-2 py-1.5 text-center"><span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-bold">' + (pr.유형코드 || pr.철의장유형코드_원본 || '-') + '</span></td>' +
+                        '<td class="px-2 py-1.5 text-right font-medium">' + (pr.발주수량 || 1) + '</td>' +
+                        '<td class="px-2 py-1.5 text-right font-medium">' + (pr.도급수량 || 100).toLocaleString() + '</td>' +
+                        '<td class="px-2 py-1.5 text-center text-gray-500">' + (pr.중량단위 || 'KG') + '</td>' +
+                        '<td class="px-2 py-1.5 text-right text-gray-600">' + (pr.기본단가 || 15000).toLocaleString() + '</td>' +
+                        '<td class="px-2 py-1.5 text-right font-bold text-green-600">' + prAmount.toLocaleString() + '원</td>' +
+                        '<td class="px-2 py-1.5 text-center font-mono text-gray-500">' + (pr.도장사코드 || prPaintingInfo.code || '-') + '</td>' +
+                        '<td class="px-2 py-1.5 text-gray-700">' + (pr.도장사 || prPaintingInfo.name || '-') + '</td>' +
+                        '</tr>';
+                }
+                
+                html += '</tbody></table></div></div></td></tr>';
             }
             
             tbody.innerHTML = html;
