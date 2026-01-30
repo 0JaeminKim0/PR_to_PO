@@ -1494,6 +1494,7 @@ app.get('/', (c) => {
                         <tr>
                             <th>자재번호</th>
                             <th>PR NO</th>
+                            <th>유형코드</th>
                             <th>검토구분</th>
                             <th>검증결과</th>
                             <th>권장조치</th>
@@ -2168,9 +2169,16 @@ app.get('/', (c) => {
                 if (item.검증결과 === '적합') 결과Color = 'text-green-600';
                 else if (item.검증결과 === '부적합') 결과Color = 'text-red-600';
                 
+                // 유형코드 표시: 변경요청코드가 있으면 '현재→변경' 형식, 없으면 현재코드만
+                var 유형코드표시 = item.현재유형코드 || '-';
+                if (item.변경요청코드 && item.변경요청코드 !== item.현재유형코드) {
+                    유형코드표시 = item.현재유형코드 + '→' + item.변경요청코드;
+                }
+                
                 return '<tr>' +
                     '<td class="font-mono">' + (item.자재번호 || '').substring(0, 18) + '...</td>' +
                     '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
+                    '<td class="text-center font-semibold">' + 유형코드표시 + '</td>' +
                     '<td>' + item.검토구분 + '</td>' +
                     '<td class="' + 결과Color + '">' + item.검증결과 + '</td>' +
                     '<td class="text-center"><span class="px-2 py-1 rounded text-xs ' + 조치Badge + '">' + item.권장조치 + '</span></td>' +
