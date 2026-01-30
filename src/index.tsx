@@ -1265,7 +1265,6 @@ app.get('/', (c) => {
                 <i class="fas fa-robot text-3xl"></i>
                 <div>
                     <h1 class="text-xl font-bold">철의장재 PR-to-PO AI Agent</h1>
-                    <p class="text-indigo-200 text-sm">PoC Demo v5 - 배치 처리 + 통합 실행</p>
                 </div>
             </div>
             <div class="flex items-center space-x-3">
