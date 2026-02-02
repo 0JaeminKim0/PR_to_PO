@@ -752,18 +752,30 @@ app.post('/api/integrated/run-all', async (c) => {
           판단근거: inferReasonFromDrawing(review, llmType)
         }
         
-        // PoC용: 도면이 있는 경우 모두 적합 처리 (Vision 불일치도 적합으로)
-        phase2Results.push({
-          자재번호: review['자재번호'],
-          검토구분: '단가유형변경',
-          검증결과: '적합',
-          권장조치: '확정',
-          검증근거: changeType === llmType 
-            ? `공급사 변경유형코드 '${changeType}'이 도면 분석 결과와 일치`
-            : `공급사 변경유형코드 '${changeType}' 도면 검증 완료 (AI 분석: ${llmType})`,
-          LLM_추론: llmResult,
-          ...commonInfo
-        })
+        if (changeType === llmType) {
+          // 도면 분석 결과와 일치 → 적합
+          phase2Results.push({
+            자재번호: review['자재번호'],
+            검토구분: '단가유형변경',
+            검증결과: '적합',
+            권장조치: '확정',
+            검증근거: `공급사 변경유형코드 '${changeType}'이 도면 분석 결과와 일치`,
+            LLM_추론: llmResult,
+            ...commonInfo
+          })
+        } else {
+          // Vision 불일치 → HITL
+          phase2Results.push({
+            자재번호: review['자재번호'],
+            검토구분: '단가유형변경',
+            검증결과: '부적합',
+            권장조치: 'HITL',
+            검증근거: `공급사 요청 '${changeType}' ≠ AI 도면 분석 '${llmType}'. 담당자 검토 필요`,
+            HITL유형: 'Vision불일치',
+            LLM_추론: llmResult,
+            ...commonInfo
+          })
+        }
       } else {
         // 도면 정보 없음 - 텍스트 기반 검증
         if (currentType === changeType) {
@@ -1538,6 +1550,7 @@ app.get('/', (c) => {
                     <button id="hitl-filter-all" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">전체</button>
                     <button id="hitl-filter-negotiation" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">협상필요</button>
                     <button id="hitl-filter-impossible" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">제작불가</button>
+                    <button id="hitl-filter-vision" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Vision 불일치</button>
                     <button id="hitl-filter-nodrawing" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">도면 없음</button>
                 </div>
                 
@@ -2363,11 +2376,12 @@ app.get('/', (c) => {
         }
         
         function setupHitlFilters() {
-            const filters = ['all', 'negotiation', 'impossible', 'nodrawing'];
+            const filters = ['all', 'negotiation', 'impossible', 'vision', 'nodrawing'];
             const filterMap = {
                 'all': null,
                 'negotiation': '협상필요',
                 'impossible': '제작불가',
+                'vision': 'Vision불일치',
                 'nodrawing': '도면없음'
             };
             
