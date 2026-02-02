@@ -140,7 +140,7 @@ type Phase2BatchResult = {
   변경요청단가?: number
   변경유형코드명?: string
   // HITL 유형 구분
-  HITL유형?: '협상필요' | 'Vision불일치' | '도면없음'
+  HITL유형?: '협상필요' | 'Vision불일치' | '도면없음' | '제작불가'
 }
 
 // PO 결과 타입
@@ -676,7 +676,7 @@ app.post('/api/integrated/run-all', async (c) => {
         자재내역: review['자재내역'] || prInfo?.자재내역 || '',
         현재유형코드: prInfo?.유형코드 || review['철의장유형코드'] || '',
         발주금액: 0,
-        HITL유형: '협상필요'  // 제작불가도 협상필요 카테고리로 표시
+        HITL유형: '제작불가'
       })
     }
     
@@ -1537,7 +1537,7 @@ app.get('/', (c) => {
                 <div class="flex space-x-2 mb-4 border-b">
                     <button id="hitl-filter-all" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">전체</button>
                     <button id="hitl-filter-negotiation" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">협상필요</button>
-                    <button id="hitl-filter-vision" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Vision 불일치</button>
+                    <button id="hitl-filter-impossible" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">제작불가</button>
                     <button id="hitl-filter-nodrawing" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">도면 없음</button>
                 </div>
                 
@@ -2363,11 +2363,11 @@ app.get('/', (c) => {
         }
         
         function setupHitlFilters() {
-            const filters = ['all', 'negotiation', 'vision', 'nodrawing'];
+            const filters = ['all', 'negotiation', 'impossible', 'nodrawing'];
             const filterMap = {
                 'all': null,
                 'negotiation': '협상필요',
-                'vision': 'Vision불일치',
+                'impossible': '제작불가',
                 'nodrawing': '도면없음'
             };
             
@@ -2417,6 +2417,9 @@ app.get('/', (c) => {
                 } else if (hitlType === '도면없음') {
                     typeBadgeClass = 'bg-gray-100 text-gray-800';
                     typeIcon = 'fas fa-file-alt';
+                } else if (hitlType === '제작불가') {
+                    typeBadgeClass = 'bg-purple-100 text-purple-800';
+                    typeIcon = 'fas fa-ban';
                 }
                 
                 // HITL 유형별 추가 정보 섹션
@@ -2485,6 +2488,17 @@ app.get('/', (c) => {
                         '</div>' +
                         '</div>' +
                         '<div class="text-xs text-gray-500 mt-2 text-center">도면 정보가 없어 자동 검증 불가</div>' +
+                        '</div>';
+                } else if (hitlType === '제작불가') {
+                    additionalInfo = '<div class="bg-purple-50 border border-purple-200 rounded-lg p-3">' +
+                        '<div class="flex items-center mb-2">' +
+                        '<i class="fas fa-ban text-purple-500 mr-2"></i>' +
+                        '<span class="font-semibold text-purple-800">제작 불가 사유</span>' +
+                        '</div>' +
+                        '<div class="text-sm text-purple-700">' +
+                        '<div class="mb-2">공급사에서 해당 자재의 제작이 불가능하다고 회신하였습니다.</div>' +
+                        '<div class="text-xs text-purple-500">담당자 검토 후 대체 공급사 선정 또는 설계 변경이 필요합니다.</div>' +
+                        '</div>' +
                         '</div>';
                 }
                 
