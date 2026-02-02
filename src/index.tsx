@@ -1434,6 +1434,38 @@ app.get('/', (c) => {
         <!-- 순차적 결과 표시 영역 (Step별 완료 후 나타남) -->
         <!-- =============================================== -->
         
+        <!-- PR 검토 결과 (PR 검토 및 발주 방식 판단 완료 후 표시) -->
+        <section id="phase1-inline-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
+            <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-2 text-white">
+                    <i class="fas fa-search"></i>
+                    <span class="font-semibold">PR 검토 및 발주 방식 판단 결과</span>
+                </div>
+                <div class="flex items-center space-x-4 text-white text-sm">
+                    <span>물량검토: <strong id="p1i-review">0</strong>건</span>
+                    <span>견적대상: <strong id="p1i-quote">0</strong>건</span>
+                </div>
+            </div>
+            <div id="phase1-inline-content" class="p-4 max-h-72 overflow-auto scrollbar-thin">
+                <table class="result-table w-full text-xs">
+                    <thead>
+                        <tr>
+                            <th>자재번호</th>
+                            <th>PR NO</th>
+                            <th>계약단가</th>
+                            <th>유형코드</th>
+                            <th>적정성</th>
+                            <th>권장코드</th>
+                            <th>도장경유</th>
+                            <th>최종분류</th>
+                        </tr>
+                    </thead>
+                    <tbody id="phase1-inline-body">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        
         <!-- 협력사 물량검토 현황판 (협력사 물량검토 요청 완료 후 표시) - 아코디언 UI -->
         <section id="company-status-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
             <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-3 flex items-center justify-between">
@@ -1462,6 +1494,38 @@ app.get('/', (c) => {
                         </tr>
                     </thead>
                     <tbody id="company-status-body">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        
+        <!-- 물량검토 검증 결과 (협력사 물량검토 결과 검증 완료 후 표시) -->
+        <section id="phase2-inline-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
+            <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-2 text-white">
+                    <i class="fas fa-check-double"></i>
+                    <span class="font-semibold">협력사 물량검토 결과 검증</span>
+                </div>
+                <div class="flex items-center space-x-4 text-white text-sm">
+                    <span>확정: <strong id="p2i-confirmed">0</strong>건</span>
+                    <span>HITL: <strong id="p2i-hitl">0</strong>건</span>
+                    <span>취소: <strong id="p2i-canceled">0</strong>건</span>
+                </div>
+            </div>
+            <div id="phase2-inline-content" class="p-4 max-h-72 overflow-auto scrollbar-thin">
+                <table class="result-table w-full text-xs">
+                    <thead>
+                        <tr>
+                            <th>자재번호</th>
+                            <th>PR NO</th>
+                            <th>유형코드</th>
+                            <th>검토구분</th>
+                            <th>검증결과</th>
+                            <th>권장조치</th>
+                            <th>검증근거</th>
+                        </tr>
+                    </thead>
+                    <tbody id="phase2-inline-body">
                     </tbody>
                 </table>
             </div>
@@ -1664,7 +1728,9 @@ app.get('/', (c) => {
             overallStatus.textContent = '실행 중...';
             
             // 순차적 결과 영역 숨기기
+            document.getElementById('phase1-inline-section').classList.add('hidden');
             document.getElementById('company-status-section').classList.add('hidden');
+            document.getElementById('phase2-inline-section').classList.add('hidden');
             document.getElementById('po-generation-section').classList.add('hidden');
             
             try {
@@ -1726,7 +1792,8 @@ app.get('/', (c) => {
             // 흐름 요약 - 물량검토대상 업데이트
             document.getElementById('flow-review-target').textContent = state.steps.step1.data.물량검토대상;
             
-            // Phase 1 결과 테이블 표시 (삭제됨)
+            // ★ Step 1 완료 후 Phase 1 결과 테이블 표시
+            renderPhase1Inline(state);
             await sleep(300);
             
             // Step 2
@@ -1836,7 +1903,8 @@ app.get('/', (c) => {
             );
             updateProgressBar(67);
             
-            // Phase 2 결과 테이블 표시 (삭제됨)
+            // ★ Step 4 완료 후 Phase 2 결과 테이블 표시
+            renderPhase2Inline(state);
             await sleep(300);
             
             // Step 5: PO 자동 생성
@@ -1890,7 +1958,36 @@ app.get('/', (c) => {
         // ====================================================================
         // 순차적 결과 렌더링 함수
         // ====================================================================
-        // renderPhase1Inline - 삭제됨
+        function renderPhase1Inline(state) {
+            const section = document.getElementById('phase1-inline-section');
+            const tbody = document.getElementById('phase1-inline-body');
+            const p1 = state.phase1Results;
+            
+            // 통계 업데이트
+            const reviewCount = p1.filter(function(r) { return r.최종분류 && r.최종분류.includes('물량검토'); }).length;
+            const quoteCount = p1.filter(function(r) { return r.최종분류 && r.최종분류.includes('견적'); }).length;
+            document.getElementById('p1i-review').textContent = reviewCount;
+            document.getElementById('p1i-quote').textContent = quoteCount;
+            
+            // 테이블 렌더링
+            tbody.innerHTML = p1.map(function(item) {
+                var 분류Badge = (item.최종분류 || '').includes('물량검토') ? 'badge-물량검토' : 'badge-견적대상';
+                var 적정성Color = item.유형코드_적정여부 === 'Y' ? 'text-green-600' : 'text-red-600';
+                
+                return '<tr>' +
+                    '<td class="font-mono">' + (item.자재번호 || '').substring(0, 18) + '...</td>' +
+                    '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
+                    '<td class="text-center font-bold ' + (item.계약단가존재 === 'Y' ? 'text-green-600' : 'text-red-600') + '">' + item.계약단가존재 + '</td>' +
+                    '<td class="text-center">' + item.유형코드 + '</td>' +
+                    '<td class="text-center ' + 적정성Color + '">' + item.유형코드_적정여부 + '</td>' +
+                    '<td class="text-center text-indigo-600">' + (item.권장코드 || '-') + '</td>' +
+                    '<td class="text-center">' + item.도장사경유 + '</td>' +
+                    '<td class="text-center"><span class="px-2 py-1 rounded text-xs ' + 분류Badge + '">' + item.최종분류 + '</span></td>' +
+                '</tr>';
+            }).join('');
+            
+            section.classList.remove('hidden');
+        }
         
         function renderCompanyStatus(state) {
             const section = document.getElementById('company-status-section');
@@ -2071,7 +2168,49 @@ app.get('/', (c) => {
             }
         }
         
-        // renderPhase2Inline - 삭제됨
+        function renderPhase2Inline(state) {
+            const section = document.getElementById('phase2-inline-section');
+            const tbody = document.getElementById('phase2-inline-body');
+            const p2 = state.phase2Results;
+            
+            // 통계 업데이트
+            const confirmedCount = p2.filter(function(r) { return r.권장조치 === '확정'; }).length;
+            const hitlCount = p2.filter(function(r) { return r.권장조치 === 'HITL'; }).length;
+            const canceledCount = p2.filter(function(r) { return r.권장조치 === '검토취소'; }).length;
+            
+            document.getElementById('p2i-confirmed').textContent = confirmedCount;
+            document.getElementById('p2i-hitl').textContent = hitlCount;
+            document.getElementById('p2i-canceled').textContent = canceledCount;
+            
+            // 테이블 렌더링
+            tbody.innerHTML = p2.map(function(item) {
+                var 조치Badge = 'badge-HITL';
+                if (item.권장조치 === '확정') 조치Badge = 'badge-확정';
+                else if (item.권장조치 === '검토취소') 조치Badge = 'badge-검토취소';
+                
+                var 결과Color = 'text-yellow-600';
+                if (item.검증결과 === '적합') 결과Color = 'text-green-600';
+                else if (item.검증결과 === '부적합') 결과Color = 'text-red-600';
+                
+                // 유형코드 표시: 변경요청코드가 있으면 '현재→변경' 형식, 없으면 현재코드만
+                var 유형코드표시 = item.현재유형코드 || '-';
+                if (item.변경요청코드 && item.변경요청코드 !== item.현재유형코드) {
+                    유형코드표시 = item.현재유형코드 + '→' + item.변경요청코드;
+                }
+                
+                return '<tr>' +
+                    '<td class="font-mono">' + (item.자재번호 || '').substring(0, 18) + '...</td>' +
+                    '<td class="text-indigo-600 font-semibold">' + (item.PR_NO || '-') + '</td>' +
+                    '<td class="text-center font-semibold">' + 유형코드표시 + '</td>' +
+                    '<td>' + item.검토구분 + '</td>' +
+                    '<td class="' + 결과Color + '">' + item.검증결과 + '</td>' +
+                    '<td class="text-center"><span class="px-2 py-1 rounded text-xs ' + 조치Badge + '">' + item.권장조치 + '</span></td>' +
+                    '<td class="text-xs text-gray-600">' + item.검증근거 + '</td>' +
+                '</tr>';
+            }).join('');
+            
+            section.classList.remove('hidden');
+        }
         
         function renderPOTable(state) {
             state = state || currentState;
@@ -2122,7 +2261,9 @@ app.get('/', (c) => {
             overallStatus.textContent = '대기 중';
             
             // 순차적 결과 섹션 숨기기
+            document.getElementById('phase1-inline-section').classList.add('hidden');
             document.getElementById('company-status-section').classList.add('hidden');
+            document.getElementById('phase2-inline-section').classList.add('hidden');
             document.getElementById('po-generation-section').classList.add('hidden');
             document.getElementById('flow-summary').classList.add('hidden');
             document.getElementById('log-section').classList.add('hidden');
