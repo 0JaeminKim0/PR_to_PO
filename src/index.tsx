@@ -1588,14 +1588,10 @@ app.get('/', (c) => {
                 <i class="fas fa-rocket text-6xl text-indigo-500 mb-4"></i>
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">전체 실행 준비 완료</h2>
                 <p class="text-gray-500 mb-6">버튼을 클릭하면 전체 Work Process가 자동으로 연속 실행됩니다</p>
-                <div class="flex justify-center space-x-8 text-sm text-gray-600">
+                <div class="flex justify-center text-sm text-gray-600">
                     <div class="flex items-center">
                         <i class="fas fa-database mr-2 text-indigo-500"></i>
                         PR 데이터: <span class="font-bold ml-1">56</span>건
-                    </div>
-                    <div class="flex items-center">
-                        <i class="fas fa-clipboard-check mr-2 text-purple-500"></i>
-                        물량검토 결과: <span class="font-bold ml-1">53</span>건
                     </div>
                 </div>
                 <button id="btn-run-all-center" class="mt-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-bold transition shadow-lg">
