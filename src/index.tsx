@@ -1531,6 +1531,27 @@ app.get('/', (c) => {
             </div>
         </section>
         
+        <!-- 결과 요약 섹션 (완료 시 표시) - HITL 필요 건 -->
+        <section id="summary-section" class="hidden">
+            <div id="hitl-section" class="bg-white rounded-xl shadow-md p-6 mb-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-user-cog mr-2 text-yellow-600"></i>
+                    HITL 필요 건 (<span id="hitl-count">0</span>건) - 담당자 검토 필요
+                </h3>
+                
+                <!-- HITL 유형별 필터 탭 -->
+                <div class="flex space-x-2 mb-4 border-b">
+                    <button id="hitl-filter-all" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">전체</button>
+                    <button id="hitl-filter-negotiation" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">협상필요</button>
+                    <button id="hitl-filter-vision" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Vision 불일치</button>
+                    <button id="hitl-filter-nodrawing" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">도면 없음</button>
+                </div>
+                
+                <div id="hitl-list" class="space-y-4 max-h-[600px] overflow-y-auto scrollbar-thin">
+                </div>
+            </div>
+        </section>
+        
         <!-- PO 자동 생성 결과 (PO 자동 생성 완료 후 표시) -->
         <section id="po-generation-section" class="hidden bg-white rounded-xl shadow-md mb-6 overflow-hidden">
             <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex items-center justify-between">
@@ -1558,27 +1579,6 @@ app.get('/', (c) => {
                     <tbody id="po-table-body">
                     </tbody>
                 </table>
-            </div>
-        </section>
-        
-        <!-- 결과 요약 섹션 (완료 시 표시) - HITL 필요 건 -->
-        <section id="summary-section" class="hidden">
-            <div id="hitl-section" class="bg-white rounded-xl shadow-md p-6 mb-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-user-cog mr-2 text-yellow-600"></i>
-                    HITL 필요 건 (<span id="hitl-count">0</span>건) - 담당자 검토 필요
-                </h3>
-                
-                <!-- HITL 유형별 필터 탭 -->
-                <div class="flex space-x-2 mb-4 border-b">
-                    <button id="hitl-filter-all" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">전체</button>
-                    <button id="hitl-filter-negotiation" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">협상필요</button>
-                    <button id="hitl-filter-vision" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Vision 불일치</button>
-                    <button id="hitl-filter-nodrawing" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">도면 없음</button>
-                </div>
-                
-                <div id="hitl-list" class="space-y-4 max-h-[600px] overflow-y-auto scrollbar-thin">
-                </div>
             </div>
         </section>
 
