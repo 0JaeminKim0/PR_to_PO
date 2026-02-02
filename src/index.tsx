@@ -1649,7 +1649,7 @@ app.get('/', (c) => {
                 updateProgressBar(10);
                 
                 addLog('PR 검토 및 발주 방식 판단 시작', 'header');
-                addLog('분석 대상: 20건', 'info', 1);
+                addLog('분석 대상: 56건', 'info', 1);
                 addLog('PR 자재별 계약 여부 판별 중...', 'info', 1);
                 
                 const response = await fetch('/api/integrated/run-all', { method: 'POST' });
