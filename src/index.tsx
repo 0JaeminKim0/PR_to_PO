@@ -1880,7 +1880,7 @@ app.get('/', (c) => {
             await sleep(150);
             
             if (impossible.length > 0) {
-                addLog('제작불가 ' + impossible.length + '건 → 자동 취소', 'success', 1);
+                addLog('제작불가 ' + impossible.length + '건 → HITL', 'warning', 1);
             }
             await sleep(150);
             
