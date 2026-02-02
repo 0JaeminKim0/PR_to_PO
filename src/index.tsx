@@ -502,7 +502,7 @@ app.post('/api/integrated/run-all', async (c) => {
       apiKey, 
       buildBatchPhase1SystemPrompt(), 
       buildBatchPhase1UserPrompt(prList),
-      8192
+      16384
     )
     
     let phase1Results = parseJsonArrayResponse(phase1Response)
@@ -1148,7 +1148,31 @@ function parseJsonArrayResponse(text: string): any[] {
   } else if (text.includes('```')) {
     jsonStr = text.split('```')[1].split('```')[0]
   }
-  return JSON.parse(jsonStr.trim())
+  
+  // JSON이 잘렸는지 확인하고 복구 시도
+  jsonStr = jsonStr.trim()
+  
+  // 배열이 제대로 닫히지 않은 경우 복구
+  if (jsonStr.startsWith('[') && !jsonStr.endsWith(']')) {
+    // 마지막 완전한 객체까지만 파싱
+    const lastCompleteObj = jsonStr.lastIndexOf('}')
+    if (lastCompleteObj > 0) {
+      jsonStr = jsonStr.substring(0, lastCompleteObj + 1) + ']'
+    }
+  }
+  
+  try {
+    return JSON.parse(jsonStr)
+  } catch (e) {
+    console.error('JSON 파싱 에러, 복구 시도:', e)
+    // 추가 복구 시도: 불완전한 마지막 객체 제거
+    const lastComma = jsonStr.lastIndexOf('},')
+    if (lastComma > 0) {
+      jsonStr = jsonStr.substring(0, lastComma + 1) + ']'
+      return JSON.parse(jsonStr)
+    }
+    throw e
+  }
 }
 
 function inferTypeFromDrawing(review: any, drawingInfo: any): string {
