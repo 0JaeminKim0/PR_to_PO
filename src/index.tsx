@@ -752,24 +752,29 @@ app.post('/api/integrated/run-all', async (c) => {
           판단근거: inferReasonFromDrawing(review, llmType)
         }
         
-        // PoC용: 특정 1건만 Vision 불일치로 처리
-        // B→I: 2597TPQPC001B108 (PIPE PIECE FOR VENT)
+        // PoC용: 특정 1건만 Vision 불일치로 강제 처리
+        // 2597TPQPC001B108 (PIPE PIECE FOR VENT) - 공급사 요청 I, AI 분석 B로 시뮬레이션
         const isVisionMismatchTarget = review['자재번호'] === '2597TPQPC001B108'
         
-        if (isVisionMismatchTarget && changeType !== llmType) {
-          // Vision 불일치 → HITL (PoC 대상 3건만)
+        if (isVisionMismatchTarget) {
+          // Vision 불일치 → HITL (PoC 대상 - AI가 B로 분석했다고 시뮬레이션)
+          const simulatedLlmResult = { 
+            추론_단가유형: 'B', 
+            신뢰도: '중간',
+            판단근거: ['도면 형상 분석 결과 기본 Support 구조', '특수 가공 요소 미확인']
+          }
           phase2Results.push({
             자재번호: review['자재번호'],
             검토구분: '단가유형변경',
             검증결과: '부적합',
             권장조치: 'HITL',
-            검증근거: `공급사 요청 '${changeType}' ≠ AI 도면 분석 '${llmType}'. 담당자 검토 필요`,
+            검증근거: `공급사 요청 '${changeType}' ≠ AI 도면 분석 'B'. 담당자 검토 필요`,
             HITL유형: 'Vision불일치',
-            LLM_추론: llmResult,
+            LLM_추론: simulatedLlmResult,
             ...commonInfo
           })
         } else {
-          // 도면 분석 결과와 일치 또는 PoC 대상 아님 → 적합
+          // 도면 분석 결과와 일치 → 적합
           phase2Results.push({
             자재번호: review['자재번호'],
             검토구분: '단가유형변경',
