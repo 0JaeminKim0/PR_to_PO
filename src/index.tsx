@@ -715,7 +715,10 @@ app.post('/api/integrated/run-all', async (c) => {
     for (const review of changed) {
       const dwgFull = String(review['도면번호'] || '')
       const dwgNo = dwgFull.length > 4 ? dwgFull.substring(4) : dwgFull
-      const drawingInfo = (drawingMapping as any).index?.[dwgNo]
+      
+      // 도면유무 필드 우선 사용, 없으면 drawingMapping에서 조회
+      const hasDrawing = review['도면유무'] === 'Y'
+      const drawingInfo = hasDrawing ? { type: 'from_review_data' } : (drawingMapping as any).index?.[dwgNo]
       
       const currentType = review['철의장유형코드'] || ''
       const changeType = review['변경유형코드'] || ''
@@ -738,7 +741,7 @@ app.post('/api/integrated/run-all', async (c) => {
         발주금액: orderAmount
       }
       
-      if (drawingInfo) {
+      if (hasDrawing || drawingInfo) {
         // 도면 정보가 있으면 LLM Vision 검증 시뮬레이션
         // 실제 Vision API 호출 대신 규칙 기반 검증
         const llmType = inferTypeFromDrawing(review, drawingInfo)
