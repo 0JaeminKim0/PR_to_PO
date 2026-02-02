@@ -752,10 +752,9 @@ app.post('/api/integrated/run-all', async (c) => {
           판단근거: inferReasonFromDrawing(review, llmType)
         }
         
-        // PoC용: 특정 3건만 Vision 불일치로 처리 (기존 20건 데이터 기준)
-        // B→G: 2589TPQPD131C212, G→I: 2597TPQPC001B108, I→B: 5510TFSGP501D153
-        const visionMismatchTargets = ['2589TPQPD131C212', '2597TPQPC001B108', '5510TFSGP501D153']
-        const isVisionMismatchTarget = visionMismatchTargets.includes(review['자재번호'])
+        // PoC용: 특정 1건만 Vision 불일치로 처리
+        // B→I: 2597TPQPC001B108 (PIPE PIECE FOR VENT)
+        const isVisionMismatchTarget = review['자재번호'] === '2597TPQPC001B108'
         
         if (isVisionMismatchTarget && changeType !== llmType) {
           // Vision 불일치 → HITL (PoC 대상 3건만)
