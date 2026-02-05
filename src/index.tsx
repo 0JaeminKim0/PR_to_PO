@@ -700,7 +700,7 @@ app.post('/api/integrated/run-all', async (c) => {
         검토구분: '협상필요',
         검증결과: '검토필요',
         권장조치: 'HITL',
-        검증근거: `공급사 요청단가 ${requestPrice.toLocaleString()}원 → AI 분석 적정단가 ${aiPriceAnalysis.적정단가.toLocaleString()}원. ${aiPriceAnalysis.협상권고}`,
+        검증근거: `공급사 요청단가 ${requestPrice.toLocaleString()}원 → AI 분석 적정단가 ${aiPriceAnalysis.AI_추천_적정단가.toLocaleString()}원. ${aiPriceAnalysis.협상전략}`,
         // PR 정보
         자재내역: prInfo?.자재내역 || review['자재내역'],
         현재유형코드: prInfo?.유형코드 || review['철의장유형코드'],
@@ -2065,7 +2065,19 @@ app.get('/', (c) => {
             await sleep(150);
             
             if (negotiation.length > 0) {
-                addLog('협상필요 ' + negotiation.length + '건 → HITL', 'warning', 1);
+                addLog('협상필요 ' + negotiation.length + '건 → AI 적정단가 분석', 'warning', 1);
+                await sleep(200);
+                // 협상필요 건별 AI 분석 결과 로그
+                for (const item of negotiation) {
+                    await sleep(150);
+                    const shortId = (item.자재번호 || '').substring(0, 15);
+                    const aiResult = item.AI_단가분석 || {};
+                    const 요청단가 = (item.변경요청단가 || 0).toLocaleString();
+                    const 적정단가 = (aiResult.AI_추천_적정단가 || 0).toLocaleString();
+                    const 전략 = aiResult.협상전략 || '';
+                    addLog('🤖 ' + shortId + ': 요청 ' + 요청단가 + '원 → AI추천 ' + 적정단가 + '원', 'info', 2);
+                    addLog('   └ ' + 전략, 'warning', 2);
+                }
             }
             await sleep(150);
             
